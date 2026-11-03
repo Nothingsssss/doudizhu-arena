@@ -1,0 +1,16 @@
+{
+  "port": 8000,
+  "arena": {
+    "move_delay": 1.5,
+    "game_pause": 8,
+    "eliminate_forever": false,
+    "max_games": null
+  },
+  "players": [
+    {"name": "机器人·阿大", "type": "bot"},
+    {"name": "机器人·阿二", "type": "bot"},
+    {"name": "机器人·阿三", "type": "bot"},
+    {"name": "机器人·阿四", "type": "bot"},
+    {"name": "机器人·阿五", "type": "bot"}
+  ]
+}
