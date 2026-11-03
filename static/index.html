@@ -2,153 +2,87 @@
 <html lang="zh">
 <head>
 <meta charset="utf-8">
-<title>AI 斗地主擂台</title>
-<style>
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; color: #fff;
-         background: radial-gradient(circle at 50% 40%, #1f7a4a, #0b3d24 70%); height: 100vh; overflow: hidden; }
-  #wrap { display: grid; grid-template-columns: 1fr 340px; height: 100vh; }
-  #table { position: relative; padding: 20px; }
-  #title { text-align: center; font-size: 28px; font-weight: bold; letter-spacing: 2px; text-shadow: 0 2px 6px #000; }
-  #info { text-align: center; font-size: 16px; opacity: .9; margin-top: 4px; }
-  .seat { position: absolute; width: 44%; background: rgba(0,0,0,.25); border-radius: 14px; padding: 12px; transition: box-shadow .3s; }
-  .seat.turn { box-shadow: 0 0 0 3px #ffd54a, 0 0 25px #ffd54a; }
-  #s0 { left: 3%; top: 90px; } #s1 { right: 3%; top: 90px; } #s2 { left: 28%; bottom: 20px; }
-  .head { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: bold; }
-  .role { font-size: 13px; padding: 2px 8px; border-radius: 10px; background: #2e7d32; }
-  .role.dz { background: #d84315; }
-  .left { margin-left: auto; font-size: 16px; opacity: .85; }
-  .hand, .played { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 8px; min-height: 46px; }
-  .card { width: 30px; height: 44px; background: #fff; color: #222; border-radius: 4px; display: flex;
-          align-items: center; justify-content: center; font-weight: bold; font-size: 15px; box-shadow: 0 1px 3px #0008; }
-  .card.joker { color: #c62828; font-size: 11px; writing-mode: vertical-rl; }
-  .card.small { width: 26px; height: 38px; font-size: 13px; }
-  .played .pass { font-size: 20px; color: #ffd54a; line-height: 46px; }
-  .say { margin-top: 8px; background: #fff; color: #222; border-radius: 10px; padding: 6px 10px; font-size: 15px; min-height: 32px; }
-  .say:empty { visibility: hidden; }
-  #center { position: absolute; left: 50%; top: 46%; transform: translate(-50%,-50%); text-align: center; }
-  #center .hand { justify-content: center; }
-  #side { background: rgba(0,0,0,.45); padding: 14px; overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
-  h3 { margin: 4px 0; font-size: 18px; color: #ffd54a; }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  td, th { padding: 3px 4px; text-align: center; } th { opacity: .7; font-weight: normal; }
-  tr.on td { color: #ffd54a; }
-  #queue { font-size: 15px; line-height: 1.6; }
-  #log { flex: 1; overflow: hidden; font-size: 13px; line-height: 1.5; opacity: .9; display: flex; flex-direction: column-reverse; }
-  #banner { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.6); }
-  #banner div { background: #fff; color: #222; padding: 30px 50px; border-radius: 18px; text-align: center; font-size: 22px; line-height: 1.7; }
-  #banner b { color: #d84315; font-size: 30px; }
-</style>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI 斗地主擂台赛</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div id="wrap">
-  <div id="table">
-    <div id="title">AI 斗地主擂台 · 输了下场</div>
-    <div id="info">等待开局…</div>
-    <div class="seat" id="s0"></div>
-    <div class="seat" id="s1"></div>
-    <div class="seat" id="s2"></div>
-    <div id="center"><div style="opacity:.8">底牌</div><div class="hand" id="bottom"></div></div>
-    <div id="banner"><div id="bannerText"></div></div>
-  </div>
-  <div id="side">
-    <h3>排行榜</h3>
-    <table><thead><tr><th>选手</th><th>积分</th><th>胜/负</th><th>连胜</th><th>最高</th></tr></thead><tbody id="rank"></tbody></table>
-    <h3>排队上场</h3>
-    <div id="queue"></div>
-    <h3>战况</h3>
-    <div id="log"></div>
-  </div>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="su0" viewBox="0 0 100 100"><path d="M50 5C35 25 8 40 8 60c0 14 11 22 22 22 8 0 14-4 17-9-1 9-5 17-12 22h30c-7-5-11-13-12-22 3 5 9 9 17 9 11 0 22-8 22-22C92 40 65 25 50 5Z"/></symbol>
+  <symbol id="su1" viewBox="0 0 100 100"><path d="M50 90C20 66 5 51 5 31 5 16 17 6 30 6c10 0 17 6 20 13 3-7 10-13 20-13 13 0 25 10 25 25 0 20-15 35-45 59Z"/></symbol>
+  <symbol id="su2" viewBox="0 0 100 100"><circle cx="50" cy="27" r="20"/><circle cx="27" cy="58" r="20"/><circle cx="73" cy="58" r="20"/><path d="M45 50h10c0 22 4 33 13 45H32c9-12 13-23 13-45Z"/></symbol>
+  <symbol id="su3" viewBox="0 0 100 100"><path d="M50 3 90 50 50 97 10 50Z"/></symbol>
+  <symbol id="star" viewBox="0 0 100 100"><path d="M50 4 62 37h35L69 58l11 34-30-21-30 21 11-34L3 37h35Z"/></symbol>
+</svg>
+<div id="viewport">
+<div id="stage">
+  <div id="bg"><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div><div class="grid"></div></div>
+
+  <!-- 顶栏 -->
+  <header id="top">
+    <div class="brand">
+      <div class="logo">
+        <svg viewBox="0 0 40 40"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe08a"/><stop offset="1" stop-color="#ff8a3d"/></linearGradient></defs>
+          <rect x="6" y="4" width="20" height="28" rx="4" fill="url(#lg)" transform="rotate(-12 16 18)"/>
+          <rect x="14" y="8" width="20" height="28" rx="4" fill="#fff" stroke="#ffb347" stroke-width="1.5" transform="rotate(10 24 22)"/>
+          <text x="24" y="27" font-size="13" font-weight="900" fill="#e53950" text-anchor="middle" transform="rotate(10 24 22)">AI</text></svg>
+      </div>
+      <div>
+        <div class="title">AI 斗地主擂台赛</div>
+        <div class="subtitle">每局淘汰一人 · 赢家守擂</div>
+      </div>
+      <div class="live"><span></span>LIVE</div>
+    </div>
+    <div class="center-info">
+      <div class="pill"><label>局数</label><b id="gameNo">-</b></div>
+      <div class="bottom-wrap"><label>底牌</label><div id="bottom" class="cards mini"></div></div>
+      <div class="pill"><label>底分</label><b id="bid">-</b></div>
+      <div class="pill mult"><label>倍数</label><b id="mult">×1</b></div>
+    </div>
+    <div class="right-info">
+      <div id="phase">等待开局</div>
+      <button id="sound" title="音效开关">音效 开</button>
+    </div>
+  </header>
+
+  <!-- 牌桌 -->
+  <main id="table">
+    <div class="felt"><div class="felt-inner"></div><div class="watermark">AI 斗地主</div></div>
+    <div id="turnHint"></div>
+
+    <section class="seat" id="seat0" data-pos="left"></section>
+    <section class="seat" id="seat1" data-pos="right"></section>
+    <section class="seat" id="seat2" data-pos="bottom"></section>
+
+    <div class="played" id="played0"></div>
+    <div class="played" id="played1"></div>
+    <div class="played" id="played2"></div>
+
+    <div class="bubble" id="bubble0"></div>
+    <div class="bubble" id="bubble1"></div>
+    <div class="bubble" id="bubble2"></div>
+  </main>
+
+  <!-- 侧栏 -->
+  <aside id="side">
+    <div class="panel">
+      <h3><span class="ico"></span>排行榜</h3>
+      <div id="rank"></div>
+    </div>
+    <div class="panel">
+      <h3><span class="ico"></span>挑战者队列</h3>
+      <div id="queue"></div>
+    </div>
+    <div class="panel grow">
+      <h3><span class="ico"></span>实时战况</h3>
+      <div id="feed"></div>
+    </div>
+  </aside>
+
+  <div id="fx"></div>
+  <div id="overlay"></div>
 </div>
-<script>
-let N = {};
-const S = { names: ["","",""], roles: [null,null,null], hands: [[],[],[]], played: [null,null,null], say: ["","",""], turn: -1, bid: 0, bombs: 0 };
-
-function cardHtml(c, small) {
-  const j = c >= 16;
-  return `<div class="card${j ? " joker" : ""}${small ? " small" : ""}">${N[c]}</div>`;
-}
-function renderSeat(i) {
-  const el = document.getElementById("s" + i);
-  const role = S.roles[i];
-  const played = S.played[i];
-  el.className = "seat" + (S.turn === i ? " turn" : "");
-  el.innerHTML = `
-    <div class="head">${S.names[i] || "-"}
-      ${role ? `<span class="role ${role === "地主" ? "dz" : ""}">${role}</span>` : ""}
-      <span class="left">剩 ${S.hands[i].length} 张</span></div>
-    <div class="hand">${S.hands[i].map(c => cardHtml(c, true)).join("")}</div>
-    <div class="played">${played === null ? "" : played.length ? played.map(c => cardHtml(c)).join("") : '<span class="pass">不要</span>'}</div>
-    <div class="say">${escapeHtml(S.say[i] || "")}</div>`;
-}
-function renderAll() { for (let i = 0; i < 3; i++) renderSeat(i); }
-function escapeHtml(s) { return s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
-function log(t) { const d = document.createElement("div"); d.textContent = t; const L = document.getElementById("log"); L.prepend(d); while (L.children.length > 60) L.lastChild.remove(); }
-function fmt(cards) { return cards.length ? cards.map(c => N[c]).join(" ") : "不要"; }
-
-function renderBoard(snap) {
-  const tbl = new Set(snap.table);
-  const rows = Object.entries(snap.stats).sort((a, b) => b[1].score - a[1].score);
-  document.getElementById("rank").innerHTML = rows.map(([n, s]) =>
-    `<tr class="${tbl.has(n) ? "on" : ""}"><td>${escapeHtml(n)}</td><td>${s.score}</td><td>${s.wins}/${s.losses}</td><td>${s.streak}</td><td>${s.best_streak}</td></tr>`).join("");
-  document.getElementById("queue").innerHTML =
-    (snap.queue.length ? snap.queue.map((n, i) => `${i + 1}. ${escapeHtml(n)}`).join("<br>") : "（无人排队）") +
-    (snap.out.length ? `<br><span style="opacity:.6">已出局：${snap.out.map(escapeHtml).join("、")}</span>` : "");
-}
-
-function handle(ev) {
-  const d = ev.data;
-  switch (ev.type) {
-    case "game_start":
-      document.getElementById("banner").style.display = "none";
-      S.names = d.table; S.roles = [null,null,null]; S.played = [null,null,null]; S.say = ["","",""]; S.turn = -1; S.bombs = 0;
-      document.getElementById("bottom").innerHTML = [0,1,2].map(() => '<div class="card" style="background:#1565c0"></div>').join("");
-      document.getElementById("info").textContent = `第 ${d.game_no} 局 · 叫地主中`;
-      renderBoard(d); log(`—— 第 ${d.game_no} 局：${d.table.join("、")} ——`);
-      break;
-    case "deal": S.hands = d.hands; break;
-    case "redeal": log(d.reason); break;
-    case "bid":
-      S.turn = d.seat; S.say[d.seat] = (d.bid ? `叫 ${d.bid} 分！` : "不叫") + (d.say ? " " + d.say : "");
-      log(`${S.names[d.seat]} ${d.bid ? "叫 " + d.bid + " 分" : "不叫"}`);
-      break;
-    case "landlord":
-      S.roles = d.roles; S.hands = d.hands; S.bid = d.bid; S.say = ["","",""]; S.turn = d.seat;
-      document.getElementById("bottom").innerHTML = d.bottom.map(c => cardHtml(c)).join("");
-      document.getElementById("info").textContent = `底分 ${d.bid} · 地主 ${S.names[d.seat]}`;
-      log(`${S.names[d.seat]} 当地主，底牌 ${fmt(d.bottom)}`);
-      break;
-    case "play":
-      S.hands = d.hands; S.played[d.seat] = d.cards; S.say[d.seat] = d.say || "";
-      S.turn = (d.seat + 1) % 3;
-      if (d.type === "炸弹" || d.type === "王炸") S.bombs++;
-      document.getElementById("info").textContent = `底分 ${S.bid} · 炸弹 ${S.bombs} 个`;
-      log(`${S.names[d.seat]}：${d.cards.length ? d.type + " " + fmt(d.cards) : "不要"}`);
-      break;
-    case "game_end": {
-      S.turn = -1; S.hands = d.hands_left;
-      const win = d.winner_side === "地主" ? "地主胜" : "农民胜";
-      document.getElementById("bannerText").innerHTML =
-        `${win}${d.spring ? "（春天！）" : ""} · 倍数 ×${d.multiplier}<br><b>${escapeHtml(d.loser)} 下场</b><br>${escapeHtml(d.reason)}` +
-        (d.newcomer ? `<br>下一位上场：${escapeHtml(d.newcomer)}` : "");
-      document.getElementById("banner").style.display = "flex";
-      log(`${win}，${d.loser} 下场（${d.reason}）` + (d.newcomer ? `，${d.newcomer} 上场` : ""));
-      renderBoard(d);
-      break;
-    }
-    case "champion":
-      document.getElementById("bannerText").innerHTML = `<b>最后的赢家</b><br>${d.names.map(escapeHtml).join("、")}`;
-      document.getElementById("banner").style.display = "flex";
-      break;
-  }
-  renderAll();
-}
-
-fetch("/names").then(r => r.json()).then(n => {
-  N = n;
-  const es = new EventSource("/events");
-  es.onmessage = e => handle(JSON.parse(e.data));
-});
-</script>
+</div>
+<script src="app.js"></script>
 </body>
 </html>

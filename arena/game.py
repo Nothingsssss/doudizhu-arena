@@ -30,9 +30,12 @@ class Game:
             for k in range(3):
                 seat = (start + k) % 3
                 view = {"hand": hands[seat], "current_bid": best, "seat": seat, "names": names}
+                self.emit("turn", {"seat": seat, "phase": "bid"})
+                t0 = time.time()
                 b, say = self.players[seat].bid(view)
                 b = b if (b == 0 or best < b <= 3) else 0
-                self.emit("bid", {"seat": seat, "bid": b, "say": say})
+                self.emit("bid", {"seat": seat, "bid": b, "say": say,
+                                  "think_ms": int((time.time() - t0) * 1000)})
                 self._sleep()
                 if b > best:
                     best, landlord = b, seat
@@ -68,7 +71,10 @@ class Game:
                 "prev_is_teammate": prev_seat is not None and roles[prev_seat] == roles[turn] == "农民",
                 "prev_player_cards_left": len(hands[prev_seat]) if prev_seat is not None else 99,
             }
+            self.emit("turn", {"seat": turn, "phase": "play", "lead": prev is None})
+            t0 = time.time()
             cards, say = self.players[turn].play(view)
+            think_ms = int((time.time() - t0) * 1000)
             try:
                 move = validate(cards, hands[turn], prev)
             except ValueError as e:   # 理论上 Player 已校验，这里再兜一次
@@ -89,14 +95,17 @@ class Game:
                 history.append((names[turn], roles[turn], []))
             self.emit("play", {"seat": turn, "cards": list(move.cards) if move else [],
                                "type": TYPE_NAMES[move.type] if move else "不要",
+                               "kind": move.type if move else "pass",
                                "say": say, "cards_left": [len(h) for h in hands],
-                               "hands": [list(h) for h in hands]})
+                               "hands": [list(h) for h in hands], "think_ms": think_ms,
+                               "multiplier": base * (2 ** bombs)})
             self._sleep()
             if not hands[turn]:
                 winner_side = roles[turn]
                 break
             if passes == 2:
                 prev, prev_seat, passes = None, None, 0
+                self.emit("new_round", {"seat": (turn + 1) % 3})
             turn = (turn + 1) % 3
 
         # 春天：农民一张没出 / 反春：地主只出了第一手
@@ -135,9 +144,11 @@ class Arena:
                                "streak": 0, "best_streak": 0, "eliminated": 0}
                       for p in players}
         self.running = True
+        self.profiles = {p.name: {"avatar": p.avatar, "color": p.color, "model": p.model}
+                         for p in players}
 
     def snapshot(self):
-        return {"game_no": self.game_no,
+        return {"game_no": self.game_no, "profiles": self.profiles,
                 "table": [p.name for p in self.table],
                 "queue": [p.name for p in self.queue],
                 "out": [p.name for p in self.out],

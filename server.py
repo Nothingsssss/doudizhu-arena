@@ -47,9 +47,11 @@ class Bus:
             backlog = list(self.current_game)
             if self.last_snapshot and self.last_snapshot not in backlog:
                 backlog.insert(0, self.last_snapshot)
+            # 在锁内放入回放，保证新事件排在回放之后
+            for m in backlog:
+                q.put(m)
+            q.put('{"type": "synced", "data": {}}')   # 回放结束，页面开始播放特效和音效
             self.clients.append(q)
-        for m in backlog:
-            q.put(m)
         return q
 
     def unsubscribe(self, q):

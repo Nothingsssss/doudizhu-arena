@@ -9,8 +9,11 @@ from .cards import NAMES, TYPE_NAMES, fmt, legal_moves, parse, validate
 
 
 class Player:
-    def __init__(self, name, **_):
+    def __init__(self, name, avatar="", color="", **kw):
         self.name = name
+        self.avatar = avatar      # 头像图片地址（可选）
+        self.color = color        # 主题色，如 "#4f8cff"（可选）
+        self.model = kw.get("model", "规则机器人" if kw.get("type") == "bot" else "")
 
     def bid(self, view):
         """返回 0~3 的叫分，必须大于 view['current_bid'] 或为 0。"""
@@ -63,8 +66,8 @@ SYSTEM_PROMPT = """你正在参加一场斗地主擂台直播，观众能看到�
 
 class LLMPlayer(Player):
     def __init__(self, name, base_url, model, api_key="", api_key_env="",
-                 temperature=0.7, timeout=60, max_retries=2, extra_body=None, **_):
-        super().__init__(name)
+                 temperature=0.7, timeout=60, max_retries=2, extra_body=None, **kw):
+        super().__init__(name, model=model, **kw)
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.api_key = api_key or os.environ.get(api_key_env, "")
@@ -72,7 +75,7 @@ class LLMPlayer(Player):
         self.timeout = timeout
         self.max_retries = max_retries
         self.extra_body = extra_body or {}
-        self.fallback = BotPlayer(name)
+        self.fallback = BotPlayer(name, type="bot")
 
     # ---- HTTP ----
     def _chat(self, messages):

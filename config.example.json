@@ -12,36 +12,45 @@
       "type": "llm",
       "base_url": "https://api.deepseek.com/v1",
       "model": "deepseek-chat",
-      "api_key_env": "DEEPSEEK_API_KEY"
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "color": "#4f8cff"
     },
     {
       "name": "通义千问",
       "type": "llm",
       "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
       "model": "qwen-plus",
-      "api_key_env": "DASHSCOPE_API_KEY"
+      "api_key_env": "DASHSCOPE_API_KEY",
+      "color": "#a66bff"
     },
     {
       "name": "Kimi",
       "type": "llm",
       "base_url": "https://api.moonshot.cn/v1",
       "model": "kimi-latest",
-      "api_key_env": "MOONSHOT_API_KEY"
+      "api_key_env": "MOONSHOT_API_KEY",
+      "color": "#2fd3a0"
     },
     {
       "name": "GPT",
       "type": "llm",
       "base_url": "https://api.openai.com/v1",
       "model": "gpt-4o-mini",
-      "api_key_env": "OPENAI_API_KEY"
+      "api_key_env": "OPENAI_API_KEY",
+      "color": "#ff8a4c"
     },
     {
       "name": "本地Ollama",
       "type": "llm",
       "base_url": "http://localhost:11434/v1",
       "model": "qwen2.5:14b",
-      "timeout": 120
+      "timeout": 120,
+      "color": "#ffb020"
     },
-    {"name": "机器人", "type": "bot"}
+    {
+      "name": "机器人",
+      "type": "bot",
+      "color": "#8a94b8"
+    }
   ]
 }
