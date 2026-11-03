@@ -269,6 +269,21 @@ function at(el) {
   return { x: (r.left + r.width / 2 - st.left) / k, y: (r.top + r.height / 2 - st.top) / k };
 }
 function beat() { if (LV) restartClass($("stage"), "beat", 300); }
+// 只给炸弹用：画面"咚"地震一下，0.4 秒内回正（衰减的正弦，不是随机乱抖）
+function thump(a = 1) {
+  if (!LV || !cam.el) return;
+  const t0 = performance.now(), A = 16 * a;
+  const f = (t) => {
+    const s = (t - t0) / 1000;
+    if (s > 0.42) { cam.el.style.transform = ""; return; }
+    const k = Math.exp(-s * 10);
+    cam.el.style.transform = `translate(${(A * k * Math.sin(s * 52)).toFixed(1)}px,${(A * 0.8 * k * Math.sin(s * 44 + 1.2)).toFixed(1)}px)`;
+    requestAnimationFrame(f);
+  };
+  requestAnimationFrame(f);
+}
+// 单个粒子（尾烟、尾焰用）
+function part(p) { if (LV) add(Object.assign({ drag: 0.96, vx: 0, vy: 0 }, p)); }
 
 /* ================= 音频 ================= */
 let AC = null, SFXG = null, BG = null;
@@ -371,6 +386,6 @@ function init() {
 }
 
 window.FX = { LV, AMT, rnd, pick, init, burst, glitter, embers, ring, glow, smoke, debris, confetti, rain, firework, shell,
-  shake, punch, flash, rgb, speed, bgHit, bolt, rays, beam, fly, plane, at, beat, danger,
+  shake, punch, flash, rgb, speed, bgHit, bolt, rays, beam, fly, plane, at, beat, danger, thump, part,
   ctx, sfxOut, duck, BGM, bgmStart, bgmStop, bgmToggle };
 })();

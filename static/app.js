@@ -94,7 +94,7 @@ function removeBg(d, W, H) {
 }
 async function processArt(src, p) {
   const img = await loadImg(src);
-  const k = Math.min(1, 1600 / img.naturalHeight);
+  const k = Math.min(1, 1200 / img.naturalHeight);
   const W = Math.max(1, Math.round(img.naturalWidth * k)), H = Math.max(1, Math.round(img.naturalHeight * k));
   const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
   const g = cv.getContext("2d", { willReadFrequently: true });
@@ -342,7 +342,7 @@ function setMult(m) {
     if (G.live && up) {
       const q = FX.at(pill);
       FX.burst(q.x, q.y, { n: 60, colors: ["#fff6c0", "#ffd36b", "#ff9f43"], speed: [200, 800], g: 400 });
-      FX.ring(q.x, q.y, { c: "#ffd36b", vr: 800, w: 10, life: 0.5 }); FX.shake(0.25); sfx("big");
+      FX.ring(q.x, q.y, { c: "#ffd36b", vr: 800, w: 10, life: 0.5 }); sfx("big");
     }
   };
   if (!G.live || !up) return land();
@@ -422,120 +422,117 @@ const later = (ms, fn) => setTimeout(() => { if (G.live) fn(); }, ms);
 function playPos(i) { const el = $("played" + i); return FX.at(el.querySelector(".cards") || el); }
 function seatPos(i) { return FX.at($("seat" + i).querySelector(".portrait")); }
 
+function playedCards(i) { return $("played" + i).querySelector(".cards"); }
+function rankCount(ranks) { const m = {}; ranks.forEach((r) => (m[r] = (m[r] || 0) + 1)); return m; }
+
+// 出牌特效：每种牌型对应一个动画；画面不震，只有炸弹爆炸时震一下
 function fxPlay(d) {
   if (!G.live) return;
-  const k = d.kind, p = playPos(d.seat), col = colorOf(G.seats[d.seat].name);
+  const k = d.kind, el = playedCards(d.seat), p = playPos(d.seat), col = colorOf(G.seats[d.seat].name);
+  sfx("slap");
+  if (!el) return;
   if (k === "rocket") return fxRocket(p);
   if (k === "bomb") return fxBomb(p);
-  if (k.startsWith("plane")) return fxPlane(p);
-  if (k === "straight" || k === "pair_straight") return fxStraight(p, k);
-  const heavy = /^(trio|four)/.test(k), bigCard = d.cards.some((r) => r >= 15);
-  FX.ring(p.x, p.y, { c: col, vr: heavy ? 1300 : 900, w: heavy ? 12 : 8, life: 0.45 });
-  FX.burst(p.x, p.y, { n: heavy ? 50 : 18, colors: [col, "#ffffff", "#ffd36b"], speed: [200, heavy ? 900 : 600], g: 300, life: [0.3, 0.7] });
-  FX.shake(heavy ? 0.32 : 0.15); FX.punch(heavy ? 0.022 : 0.008);
-  if (heavy && BIG_TEXT[k]) big(BIG_TEXT[k], "minor", 1100);
-  if (bigCard) {
-    FX.glow(p.x, p.y, { size: 260, c: "rgba(255,210,110,.9)", life: 0.35 });
-    FX.ring(p.x, p.y, { c: "#ffd36b", vr: 1600, w: 14, life: 0.55 });
-    FX.burst(p.x, p.y, { n: 60, colors: GOLD, speed: [300, 1100], g: 400 });
-    FX.shake(0.25); sfx("big");
+  if (k.startsWith("plane")) return fxPlane(d, el);
+  if (k === "straight" || k === "pair_straight") return fxStraight(el, k);
+  if (k.startsWith("four")) {
+    COMBO.seal(el, k === "four_two_pair" ? "四带<br>两对" : "四带二", { sfx });
+    return;
   }
-  sfx(heavy ? "heavy" : "slap");
+  if (k.startsWith("trio")) {
+    const cnt = rankCount(d.cards), trio = +Object.keys(cnt).find((r) => cnt[r] === 3);
+    const sorted = s_played(d.seat), idx = sorted.map((c, i) => (c.r === trio ? i : -1)).filter((i) => i >= 0);
+    const cards = [...el.querySelectorAll(".card")];
+    COMBO.rings(idx.map((i) => cards[i]).filter(Boolean), { sfx });
+    later(380 + 3 * 170, () => big(BIG_TEXT[k], "minor", 1100));
+    return;
+  }
+  const bigCard = d.cards.some((r) => r >= 15);
+  COMBO.glint(el, { big: bigCard });
+  FX.ring(p.x, p.y, { c: col, vr: 700, w: 5, life: 0.4 });
+  if (bigCard) later(300, () => sfx("big"));
 }
+function s_played(seat) { const s = G.seats[seat]; return Array.isArray(s.played) ? s.played.slice().sort(byAsc) : []; }
 
 function fxBomb(p) {
-  FX.punch(0.08); sfx("slap"); sfx("charge");
-  FX.glow(p.x, p.y, { size: 180, c: "rgba(255,120,0,1)", life: 0.25 });
-  later(200, () => {
-    FX.flash(`radial-gradient(circle at ${(p.x / 19.2).toFixed(1)}% ${(p.y / 10.8).toFixed(1)}%, #fff, rgba(255,140,0,.65) 35%, rgba(120,0,0,.3) 70%, transparent)`, 750);
-    FX.glow(p.x, p.y, { size: 800, c: "rgba(255,200,120,1)", life: 0.55 });
-    [["#ffffff", 2400, 28, 0], ["#ffb020", 1700, 20, 90], ["#ff3d2d", 1200, 14, 180], ["#ff9a1f", 2800, 6, 260]]
-      .forEach(([c, vr, w, dl]) => setTimeout(() => FX.ring(p.x, p.y, { c, vr, w, life: 0.75, vd: 0.94 }), dl));
-    FX.burst(p.x, p.y, { n: 260, colors: FIRE, speed: [400, 1800], g: 700, len: [0.03, 0.07], w: [2, 5], life: [0.6, 1.4] });
-    FX.debris(p.x, p.y, { n: 45 });
-    FX.smoke(p.x, p.y, { n: 26 });
-    FX.embers(p.x, p.y, { n: 90, r: 180, colors: FIRE });
-    FX.shake(1.15); FX.punch(-0.06); FX.rgb(650); FX.bgHit("hit-red", 1100);
+  COMBO.bomb({ p, sfx, onBoom: (x, y) => {
+    if (!G.live) return;
+    FX.flash(`radial-gradient(circle at ${(x / 19.2).toFixed(1)}% ${(y / 10.8).toFixed(1)}%, #fff, rgba(255,150,40,.7) 30%, rgba(140,10,0,.35) 65%, transparent)`, 700);
+    FX.glow(x, y, { size: 760, c: "rgba(255,210,130,1)", life: 0.5 });
+    FX.glow(x, y, { size: 320, c: "rgba(255,255,255,1)", life: 0.25 });
+    [["#ffffff", 2200, 26, 0], ["#ffb020", 1600, 18, 80], ["#ff3d2d", 1100, 12, 160]].forEach(([c, vr, w, dl]) => setTimeout(() => FX.ring(x, y, { c, vr, w, life: 0.7, vd: 0.94 }), dl));
+    FX.burst(x, y, { n: 240, colors: FIRE, speed: [400, 1700], g: 700, len: [0.03, 0.07], w: [2, 5], life: [0.6, 1.3] });
+    FX.debris(x, y, { n: 36, colors: ["#2a2e40", "#4a5068", "#ff5a1f", "#ffd25a"] });
+    FX.smoke(x, y, { n: 22, c: "rgba(90,70,60,1)" });
+    FX.embers(x, y, { n: 80, r: 170, colors: FIRE });
+    FX.bgHit("hit-red", 1000);
+    FX.thump(1);                // 全场唯一一次震屏
     big("炸弹", "bomb", 1900); sfx("bomb");
-  });
-  later(700, () => { FX.embers(p.x, p.y, { n: 50, r: 260, colors: FIRE }); FX.shake(0.3); });
+    later(600, () => FX.embers(x, y, { n: 40, r: 240, colors: FIRE }));
+  } });
 }
 
 function fxRocket(p) {
-  sfx("slap"); sfx("launch"); FX.speed(1700, "rgba(255,220,140,.7)"); FX.punch(0.05);
-  FX.shell(p.x, p.y, 765, 300, 0.5, FESTIVE, (x, y) => {
+  COMBO.rocket({ p, sfx, onBoom: (x, y) => {
     if (!G.live) return;
-    FX.flash("radial-gradient(circle at 40% 28%, #fff, rgba(255,190,60,.7) 35%, rgba(160,0,20,.35) 70%, transparent)", 950);
-    FX.glow(x, y, { size: 1000, c: "rgba(255,240,200,1)", life: 0.65 });
-    FX.firework(x, y, FESTIVE);
-    FX.burst(x, y, { n: 300, colors: FESTIVE.concat(RAINBOW), speed: [500, 2100], g: 500, len: [0.03, 0.08], w: [2, 5], life: [0.8, 1.7] });
-    ["#ffffff", "#ffd36b", "#ff9a1f", "#ff3d2d", "#ff2d6a"].forEach((c, i) => setTimeout(() => FX.ring(x, y, { c, vr: 2600 - i * 300, w: 26 - i * 4, life: 0.85, vd: 0.95 }), i * 90));
-    FX.rays(x, y, "rgba(255,211,107,.6)", 2200);
-    FX.shake(1.5); FX.punch(-0.09); FX.rgb(1000); FX.bgHit("hit-rainbow", 1700);
+    FX.flash("radial-gradient(circle at 40% 24%, #fff, rgba(255,200,80,.6) 30%, rgba(160,0,20,.3) 65%, transparent)", 800);
+    FX.glow(x, y, { size: 900, c: "rgba(255,240,200,1)", life: 0.55 });
+    FX.firework(x, y, FESTIVE, 1.6);
+    FX.burst(x, y, { n: 220, colors: FESTIVE.concat(RAINBOW), speed: [400, 1800], g: 420, len: [0.03, 0.07], w: [2, 4], life: [0.8, 1.6] });
+    ["#ffffff", "#ffd36b", "#ff5a3a"].forEach((c, i) => setTimeout(() => FX.ring(x, y, { c, vr: 2000 - i * 400, w: 18 - i * 4, life: 0.8, vd: 0.95 }), i * 100));
+    FX.rays(x, y, "rgba(255,211,107,.55)", 2200);
+    FX.bgHit("hit-rainbow", 1500);
     const jk = document.createElement("div"); jk.className = "jokers sz-xl";
     jk.innerHTML = cardHtml({ r: 16 }, 0) + cardHtml({ r: 17 }, 1);
     fxAdd(jk, 2300);
     big("王炸", "rocket", 2300); sfx("rocket");
-    for (let k = 0; k < 7; k++) {
-      later(280 + k * 200, () => {
-        const tx = FX.rnd(160, 1360), ty = FX.rnd(120, 480);
-        FX.shell(FX.rnd(250, 1250), 1080, tx, ty, FX.rnd(0.35, 0.55), FESTIVE, (a, b) => {
-          if (!G.live) return;
-          FX.firework(a, b, [FX.pick(FESTIVE), FX.pick(RAINBOW), "#ffffff"]); FX.shake(0.28); sfx("pop");
-        }, { thick: 1, size: 5 });
+    for (let k = 0; k < 6; k++) {
+      later(350 + k * 230, () => {
+        const tx = FX.rnd(160, 1380), ty = FX.rnd(110, 380);
+        FX.shell(FX.rnd(250, 1250), 1000, tx, ty, FX.rnd(0.45, 0.65), ["#ffd36b", "#ff9a1f"], (a, b) => { if (G.live) { FX.firework(a, b, [FX.pick(FESTIVE), FX.pick(RAINBOW), "#ffffff"]); sfx("pop"); } }, { thick: 1, size: 4, fall: 40 });
       });
     }
-  }, { thick: 4, size: 10, fall: 160 });
+  } });
 }
 
-function fxPlane(p) {
-  FX.speed(1500, "rgba(62,231,255,.6)"); sfx("slap"); sfx("jet");
-  big("飞机", "plane", 1600);
-  FX.ring(p.x, p.y, { c: "#3ee7ff", vr: 1400, w: 12 });
-  FX.burst(p.x, p.y, { n: 60, colors: CYAN, speed: [300, 1000], g: 200 });
-  FX.plane(1500, (x, y) => {
-    if (!G.live || x == null) return;
-    FX.ring(x, y, { c: "#ffffff", vr: 2200, w: 10, life: 0.6 });
-    FX.ring(x, y, { c: "#3ee7ff", vr: 1500, w: 18, life: 0.7 });
-    FX.shake(0.6); FX.punch(0.03); FX.rgb(400); sfx("boom");
+function fxPlane(d, el) {
+  COMBO.plane({ sfx, onMid: () => {
+    if (!G.live) return;
+    big("飞机", "plane", 1500);
+    [...el.querySelectorAll(".card")].forEach((c, i) => c.animate([{ transform: "none" }, { transform: "translateY(-22px) rotate(-4deg)" }, { transform: "none" }], { duration: 500, delay: i * 30, easing: "ease-out" }));
+    const r = COMBO.rectOf(el);
+    FX.glitter(r.x + r.w / 2, r.y, { n: 40, colors: ["#fff", "#bff6ff", "#ffd36b"], speed: [80, 360], g: 150 });
+  } });
+}
+
+function fxStraight(el, k) {
+  const pairs = k === "pair_straight";
+  const cols = pairs ? ["#ffb3e0", "#ff5fb5", "#d9b8ff", "#9b6bff"] : ["#fff3b0", "#ffc23a", "#3ee7ff", "#2a8cff"];
+  later(420, () => {
+    const total = COMBO.wave(el, { pairs, cols, sfx });
+    later(Math.min(total, 900), () => big(BIG_TEXT[k], k, 1400));
   });
-}
-
-function fxStraight(p, k) {
-  const cols = k === "straight" ? CYAN : ["#f3e8ff", "#b98bff", "#ff6fb5", "#ffffff"];
-  FX.speed(1300, k === "straight" ? "rgba(62,231,255,.5)" : "rgba(185,139,255,.5)");
-  big(BIG_TEXT[k], k, 1500); sfx("slap"); sfx("swoosh");
-  FX.shell(60, p.y, 1420, p.y, 0.45, cols, (x, y) => { if (G.live) { FX.burst(x, y, { n: 60, colors: cols, dir: 0, spread: 1.4, speed: [300, 900] }); } }, { thick: 4, size: 9, fall: 220 });
-  later(250, () => { FX.ring(p.x, p.y, { c: cols[1], vr: 1500, w: 14 }); FX.burst(p.x, p.y, { n: 70, colors: cols, speed: [300, 1100], g: 350 }); FX.shake(0.45); sfx("combo"); });
 }
 
 function fxBid(d) {
   if (!G.live || !d.bid) return;
   const p = seatPos(d.seat);
-  FX.ring(p.x, p.y, { c: "#ffd36b", vr: 600 + d.bid * 300, w: 6 + d.bid * 3, life: 0.5 });
+  FX.ring(p.x, p.y, { c: "#ffd36b", vr: 500 + d.bid * 250, w: 4 + d.bid * 2, life: 0.5 });
   if (d.bid === 3) {
-    FX.burst(p.x, p.y, { n: 100, colors: FIRE, speed: [300, 1100], g: 300 });
-    FX.embers(p.x, p.y, { n: 40, r: 60, colors: FIRE });
-    FX.shake(0.5); FX.punch(0.02);
-    big(`${G.seats[d.seat].name} 叫三分`, "lord", 1400); sfx("heavy");
+    FX.glitter(p.x, p.y, { n: 60, colors: GOLD, speed: [100, 500], g: 120 });
+    big(`${G.seats[d.seat].name} 叫三分`, "lord", 1400);
   }
 }
 
 function fxLandlord(seat, name) {
   if (!G.live) return;
   const p = seatPos(seat);
-  sfx("thunder");
-  FX.bolt(p.x, p.y, "#ffe08a");
-  later(80, () => FX.bolt(p.x, p.y, "#bfe8ff"));
-  FX.flash("rgba(255,250,220,.55)", 350);
+  sfx("lord");
   FX.glow(p.x, p.y, { size: 420, c: "rgba(255,220,120,1)", life: 0.6 });
-  FX.ring(p.x, p.y, { c: "#ffd36b", vr: 1800, w: 18, life: 0.7 });
-  FX.burst(p.x, p.y, { n: 140, colors: GOLD, speed: [300, 1300], g: 500 });
-  FX.glitter(p.x, p.y, { n: 60, colors: GOLD });
-  FX.rays(p.x, p.y, "rgba(255,211,107,.55)", 2600);
-  FX.shake(0.8); FX.punch(0.03);
+  FX.ring(p.x, p.y, { c: "#ffd36b", vr: 1200, w: 10, life: 0.7 });
+  FX.glitter(p.x, p.y - 120, { n: 90, colors: GOLD, speed: [60, 420], g: 160, life: [1, 1.8] });
+  FX.rays(p.x, p.y, "rgba(255,211,107,.5)", 2400);
   big(`${name} 成为地主`, "lord", 1800);
-  later(300, () => sfx("lord"));
 }
 
 function fxAlarm(seat, left) {
@@ -543,25 +540,19 @@ function fxAlarm(seat, left) {
   const p = seatPos(seat), name = G.seats[seat].name;
   toast(`${name} 报警！只剩 ${left} 张`);
   FX.danger(true);
-  FX.ring(p.x, p.y, { c: "#ff2d4a", vr: 900, w: 12, life: 0.7 });
-  later(250, () => FX.ring(p.x, p.y, { c: "#ff2d4a", vr: 900, w: 12, life: 0.7 }));
-  FX.burst(p.x, p.y, { n: 60, colors: ["#ff2d4a", "#ff8095", "#ffffff"], speed: [200, 800], g: 200 });
-  FX.flash("radial-gradient(ellipse, transparent 40%, rgba(255,0,40,.55))", 700);
-  FX.shake(0.45);
+  FX.ring(p.x, p.y, { c: "#ff2d4a", vr: 800, w: 8, life: 0.7 });
+  later(300, () => FX.ring(p.x, p.y, { c: "#ff2d4a", vr: 800, w: 8, life: 0.7 }));
   later(200, () => sfx("siren"));
 }
 
 function fxStart(no) {
   if (!G.live) return;
-  FX.speed(1400, "rgba(255,211,107,.55)");
   big(`第 ${no} 局`, "start", 1300); sfx("start");
   later(1050, () => {
     big("开战", "fight", 1200);
-    FX.flash("rgba(255,255,255,.35)", 300);
-    FX.ring(CENTER.x, CENTER.y, { c: "#ffd36b", vr: 2200, w: 22 });
-    FX.ring(CENTER.x, CENTER.y, { c: "#ff4d6d", vr: 1500, w: 12 });
-    FX.burst(CENTER.x, CENTER.y, { n: 140, colors: GOLD.concat("#ff4d6d"), speed: [400, 1500], g: 300 });
-    FX.shake(0.7); FX.punch(0.04); FX.rgb(350); sfx("fight");
+    FX.ring(CENTER.x, CENTER.y, { c: "#ffd36b", vr: 1600, w: 12 });
+    FX.glitter(CENTER.x, CENTER.y, { n: 80, colors: GOLD.concat("#ff4d6d"), speed: [150, 700], g: 200 });
+    sfx("fight");
   });
 }
 
@@ -609,7 +600,14 @@ const SOUNDS = {
   launch: () => { noise(0.5, 0.5, 0, 500, 7000, "bandpass"); tone(300, 0.5, "sawtooth", 0.1, 0, 2200); },
   rocket: () => { noise(1.5, 1, 0, 2000, 100); tone(80, 1.2, "sawtooth", 0.4, 0, 25); tone(45, 1.5, "sine", 0.7, 0, 20); arp([784, 988, 1175, 1568, 1976], 0.07, 0.2, "square", 0.06, 0.15); },
   pop: () => { noise(0.3, 0.6, 0, 2600); for (let k = 0; k < 6; k++) noise(0.03, 0.2, 0.1 + k * 0.045, 7000, 0, "highpass"); },
-  jet: () => { noise(1.3, 0.45, 0, 300, 4000, "bandpass"); tone(140, 1.3, "sawtooth", 0.07, 0, 700); },
+  jet: () => { noise(0.9, 0.35, 0, 300, 3000, "bandpass"); noise(1.1, 0.45, 0.8, 3000, 250, "bandpass"); tone(320, 0.9, "sawtooth", 0.05, 0, 520); tone(520, 1.1, "sawtooth", 0.05, 0.8, 260); },
+  whistle: () => tone(1900, 0.42, "sine", 0.1, 0, 520),
+  thud: () => { tone(120, 0.18, "sine", 0.5, 0, 50); noise(0.12, 0.5, 0, 800); },
+  fuse: () => { noise(0.65, 0.35, 0, 6000, 3000, "highpass"); for (let k = 0; k < 10; k++) noise(0.02, 0.25, k * 0.06, 8000, 0, "highpass"); },
+  ignite: () => { noise(0.8, 0.5, 0, 260, 900); tone(60, 0.8, "sawtooth", 0.12, 0, 90); },
+  note: (k = 0) => { const sc = [523, 587, 659, 784, 880, 1047, 1175, 1319, 1568, 1760, 2093, 2349]; const f = sc[Math.min(k, sc.length - 1)]; tone(f, 0.22, "triangle", 0.11); tone(f * 2, 0.12, "sine", 0.04); },
+  chime: (k = 0) => { const f = [880, 1109, 1319][k % 3]; tone(f, 0.6, "sine", 0.14); tone(f * 2.76, 0.3, "sine", 0.04); tone(f * 5.4, 0.15, "sine", 0.02); },
+  stamp: () => { tone(90, 0.25, "sine", 0.6, 0, 45); noise(0.15, 0.7, 0, 900); tone(196, 1.4, "sine", 0.1, 0.05); tone(392, 1.0, "sine", 0.05, 0.05); },
   thunder: () => { noise(1, 0.9, 0, 3000, 150); tone(70, 0.8, "sawtooth", 0.3, 0, 28); },
   fight: () => { arp([392, 523, 659, 1047], 0.05, 0.3, "square", 0.08); noise(0.4, 0.5, 0, 1500); tone(60, 0.5, "sine", 0.5, 0, 30); },
   siren: () => { for (let k = 0; k < 3; k++) { tone(880, 0.18, "square", 0.07, k * 0.36, 1320); tone(1320, 0.18, "square", 0.07, k * 0.36 + 0.18, 880); } },
@@ -619,7 +617,7 @@ const SOUNDS = {
   next: () => { arp([440, 554, 659, 880, 1109], 0.06, 0.16, "square", 0.06); noise(0.5, 0.3, 0, 500, 6000, "bandpass"); },
   start: () => { arp([330, 440, 554], 0.1, 0.18, "triangle", 0.1); noise(0.8, 0.3, 0, 300, 5000, "bandpass"); },
 };
-function sfx(name) { if (G.live && SFX.on && SOUNDS[name]) { try { SOUNDS[name](); } catch (e) { /* 忽略 */ } } }
+function sfx(name, arg) { if (G.live && SFX.on && SOUNDS[name]) { try { SOUNDS[name](arg); } catch (e) { /* 忽略 */ } } }
 
 /* ================= 选手语音 =================
  * 后端给每手牌一组片段 clips：[{text, url?, sim?, duration}]
@@ -728,7 +726,7 @@ async function showResult(d) {
   FX.confetti(1920, 1080, { dir: -2.14, spread: 0.7, n: 180 });
   for (let k = 0; k < 6; k++) later(150 + k * 260, () => { FX.firework(FX.rnd(300, 1620), FX.rnd(130, 380), winCols); sfx("pop"); });
   later(500, () => FX.rain({ n: 120 }));
-  if (d.spring) later(300, () => { big(lordWin ? "春天" : "反春", "spring", 2200); petals(90); FX.shake(0.6); });
+  if (d.spring) later(300, () => { big(lordWin ? "春天" : "反春", "spring", 2200); petals(90); });
 
   await wait(1700); if (seq !== G.endSeq) return;
   const rc = stampLoser(); sfx("out");
@@ -736,8 +734,7 @@ async function showResult(d) {
     const p = FX.at(rc);
     FX.flash("radial-gradient(circle, rgba(255,30,60,.55), transparent 70%)", 600);
     FX.ring(p.x, p.y, { c: "#ff2d4a", vr: 1800, w: 20, life: 0.7 });
-    FX.debris(p.x, p.y, { n: 40, colors: ["#555a70", "#2b2f44", "#ff2d4a", "#8a8fa8"] });
-    FX.shake(1.0); FX.punch(0.05); FX.rgb(500);
+    FX.burst(p.x, p.y, { n: 50, colors: ["#ff2d4a", "#ff8095", "#ffffff"], speed: [200, 700], g: 400 });
   }
   await wait(1500); if (seq !== G.endSeq) return;
   const nx = showNext();
@@ -748,7 +745,6 @@ async function showResult(d) {
     FX.ring(p.x, p.y, { c: "#3ee7ff", vr: 1400, w: 14 });
     FX.burst(p.x, p.y, { n: 110, colors: CYAN, speed: [300, 1200], g: 200 });
     FX.glitter(p.x, p.y, { n: 60, colors: CYAN });
-    FX.shake(0.5);
   }
 }
 function showChampion(d) {

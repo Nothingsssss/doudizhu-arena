@@ -155,8 +155,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; colo
 .seat[data-pos="left"] .hand { left: 34px; top: 572px; --dx: 600px; --dy: 120px; }
 .seat[data-pos="right"] .hand { right: 24px; top: 572px; --dx: -500px; --dy: 120px; }
 .seat[data-pos="bottom"] .hand { left: 400px; width: 1110px; top: 902px; display: flex; justify-content: center; --dx: 0px; --dy: -320px; }
-.seat.turn .hand .cards:not(.deal) .card { animation: wave 1.4s ease-in-out infinite; animation-delay: calc(var(--i) * 50ms); }
-@keyframes wave { 0%, 100% { transform: none; } 50% { transform: translateY(-7px); } }
+.seat.turn .hand .cards { filter: drop-shadow(0 0 10px rgba(255,210,100,.75)); transition: filter .3s; }
 
 /* ========== 扑克牌 ========== */
 .cards { display: flex; flex-direction: column; gap: 8px; }
@@ -344,14 +343,14 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; colo
   -webkit-text-stroke: 3px #5a0800;
   filter: drop-shadow(0 5px 0 #a02000) drop-shadow(0 10px 0 #4a0800) drop-shadow(0 0 28px rgba(255,140,0,.95));
   animation: bigIn 1.6s cubic-bezier(.2, 1.4, .4, 1) forwards; }
-.big.rocket { font-size: 250px; filter: drop-shadow(0 6px 0 #a02000) drop-shadow(0 12px 0 #4a0800) drop-shadow(0 0 40px rgba(255,220,120,1)) drop-shadow(0 0 80px rgba(255,80,0,.8));
-  animation: bigIn 2.1s cubic-bezier(.2, 1.4, .4, 1) forwards, jitter .06s linear 10; }
-.big.bomb { font-size: 230px; animation: bigIn 1.9s cubic-bezier(.2, 1.4, .4, 1) forwards, jitter .06s linear 12; }
+.big.rocket { font-size: 210px; top: 250px; filter: drop-shadow(0 6px 0 #a02000) drop-shadow(0 12px 0 #4a0800) drop-shadow(0 0 40px rgba(255,220,120,1)) drop-shadow(0 0 80px rgba(255,80,0,.8));
+  animation: bigIn 2.1s cubic-bezier(.2, 1.4, .4, 1) forwards; }
+.big.bomb { font-size: 190px; top: 250px; animation: bigIn 1.9s cubic-bezier(.2, 1.4, .4, 1) forwards; }
 @keyframes jitter { 50% { margin-left: 8px; margin-top: -6px; } }
-.big.plane, .big.straight, .big.pair_straight { font-size: 150px; filter: drop-shadow(0 5px 0 #a02000) drop-shadow(0 10px 0 #4a0800) drop-shadow(0 0 30px rgba(62,231,255,.9));
+.big.plane, .big.straight, .big.pair_straight { font-size: 120px; top: 230px; filter: drop-shadow(0 5px 0 #a02000) drop-shadow(0 10px 0 #4a0800) drop-shadow(0 0 30px rgba(62,231,255,.9));
   animation: sweep 1.5s cubic-bezier(.3, .8, .3, 1) forwards; }
 .big.pair_straight { filter: drop-shadow(0 5px 0 #a02000) drop-shadow(0 10px 0 #4a0800) drop-shadow(0 0 30px rgba(190,120,255,.95)); }
-.big.minor { font-size: 120px; animation: minorIn 1.1s cubic-bezier(.2, 1.5, .4, 1) forwards; }
+.big.minor { font-size: 96px; top: 230px; animation: minorIn 1.1s cubic-bezier(.2, 1.5, .4, 1) forwards; }
 .big.spring { font-size: 200px; filter: drop-shadow(0 5px 0 #a02040) drop-shadow(0 0 34px rgba(255,90,170,.95)); }
 .big.start { font-size: 130px; top: 420px; }
 .big.lord { font-size: 90px; top: 420px; }
@@ -379,7 +378,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; colo
 .danger #vig { opacity: 1; animation: vig .4s ease-in-out infinite alternate; }
 @keyframes vig { from { opacity: .45; } to { opacity: 1; } }
 /* 色散 */
-#cam.rgb #table, #cam.rgb #plaque { animation: rgb .09s steps(2) infinite; }
+
 @keyframes rgb { 0% { filter: drop-shadow(8px 0 rgba(255,0,60,.75)) drop-shadow(-8px 0 rgba(0,220,255,.75)); } 100% { filter: drop-shadow(-6px 2px rgba(255,0,60,.75)) drop-shadow(6px -2px rgba(0,220,255,.75)); } }
 #bg.hit-red::after, #bg.hit-rainbow::after { content: ""; position: absolute; inset: 0; animation: bgHit 1s ease-out forwards; }
 #bg.hit-red::after { background: radial-gradient(circle at 40% 45%, rgba(255,120,0,.75), rgba(150,0,0,.7) 60%, rgba(40,0,0,.6)); }
@@ -444,3 +443,25 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; colo
 .res-next .mini { width: 70px; height: 70px; font-size: 30px; }
 .res-next small { display: block; font-size: 15px; color: #cfe4ff; letter-spacing: 3px; font-weight: 600; }
 @keyframes nextIn { from { transform: translateX(300px); opacity: 0; } }
+
+/* ========== 牌型动画素材 ========== */
+.sprite { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform; }
+.sprite svg { display: block; overflow: visible; }
+.c-plane { filter: drop-shadow(0 10px 14px rgba(0,0,0,.45)) drop-shadow(0 0 16px rgba(255,255,255,.35)); z-index: 3; }
+.c-rocket { filter: drop-shadow(0 8px 14px rgba(0,0,0,.5)) drop-shadow(0 0 18px rgba(255,200,90,.45)); z-index: 3; }
+.c-rocket .flame { position: absolute; left: 50%; top: calc(100% - 26px); width: 54px; height: 150px; margin-left: -27px; transform-origin: 50% 0; transform: scaleY(var(--fs, 0)) scaleX(calc(.6 + var(--fs, 0) * .3)); }
+.c-rocket .flame svg { width: 100%; height: 100%; animation: flick .07s infinite alternate; filter: drop-shadow(0 0 14px #ffb020) blur(.4px); }
+@keyframes flick { from { transform: scaleX(.86); opacity: .85; } to { transform: scaleX(1.08) scaleY(1.06); opacity: 1; } }
+.c-bomb { filter: drop-shadow(0 10px 12px rgba(0,0,0,.55)); z-index: 3; }
+.c-ribbon { z-index: 1; }
+@keyframes ribbonDraw { to { stroke-dashoffset: 0; } }
+@keyframes ribbonHead { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: none; } }
+.c-halo .halo { width: 96px; height: 34px; border-radius: 50%; border: 6px solid #ffd25a; box-shadow: 0 0 18px #ffd25a, inset 0 0 12px #fff3b0; }
+.c-seal .seal { width: 132px; height: 132px; padding: 10px; border-radius: 14px; display: flex; align-items: center; justify-content: center; text-align: center;
+  background: radial-gradient(circle at 40% 35%, #e8343c, #a00c16 70%); border: 5px solid #ffd77a; box-shadow: 0 0 0 3px #a00c16, 0 0 30px rgba(255,60,40,.8), inset 0 0 0 3px rgba(255,220,160,.6); }
+.c-seal .seal span { font: 900 40px/1.1 var(--f-brush); color: #fff3d0; letter-spacing: 2px; text-shadow: 0 2px 0 #5a0408; }
+.card.glint::after { content: ""; position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen;
+  background: linear-gradient(105deg, transparent 32%, rgba(255,250,215,.95) 48%, rgba(255,225,140,.6) 54%, transparent 68%); background-size: 280% 100%; background-position: 140% 0;
+  animation: glint .55s ease-out forwards; animation-delay: var(--gd, 0ms); }
+@keyframes glint { from { background-position: 140% 0; } to { background-position: -60% 0; } }
+.played .cards { perspective: 800px; }
