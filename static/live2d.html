@@ -37,9 +37,12 @@
   #pad { width: 160px; height: 160px; border: 1px solid var(--line); border-radius: 6px; position: relative; touch-action: none; background: radial-gradient(circle, #2a1a1e, #160d10); cursor: crosshair; }
   #pad i { position: absolute; width: 14px; height: 14px; margin: -7px; border-radius: 50%; background: var(--gold); left: 50%; top: 50%; pointer-events: none; }
   #params { max-height: 280px; overflow: auto; font: 11px ui-monospace, Menlo, Consolas, monospace; }
-  #params div { display: grid; grid-template-columns: 1fr 70px 46px; gap: 6px; align-items: center; padding: 1px 0; }
-  #params s { display: block; height: 6px; background: #2a1a1e; position: relative; text-decoration: none; }
-  #params s b { position: absolute; top: 0; bottom: 0; background: var(--gold); }
+  .plist div { display: grid; grid-template-columns: 1fr 96px 46px 16px; gap: 6px; align-items: center; padding: 1px 0; }
+  .plist span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .plist div.pin span { color: var(--gold); }
+  .plist input[type=range] { width: 96px; height: 12px; }
+  #parts { max-height: 200px; overflow: auto; font: 11px ui-monospace, Menlo, Consolas, monospace; }
+  #waveCfg { width: 100%; height: 150px; background: #2a1a1e; color: var(--text); border: 1px solid var(--line); border-radius: 4px; font: 11px ui-monospace, Menlo, Consolas, monospace; }
   #log { max-height: 180px; overflow: auto; font: 11px ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; }
   #log .error { color: var(--red); } #log .warn { color: #ffc46b; }
   #perf { font: 12px ui-monospace, Menlo, Consolas, monospace; color: var(--dim); }
@@ -126,7 +129,20 @@
   </fieldset>
   <fieldset>
     <legend>参数 <small id="pCount" style="color:var(--dim)"></small></legend>
-    <div id="params"></div>
+    <div class="row"><input type="text" id="pFilter" placeholder="筛选，例如 Arm"><button id="pFree">全部释放</button></div>
+    <div id="params" class="plist"></div>
+    <div class="res">拖动滑块会固定这个参数（覆盖动作和动画），取消勾选释放</div>
+  </fieldset>
+  <fieldset>
+    <legend>部件 <small id="ptCount" style="color:var(--dim)"></small></legend>
+    <div id="parts" class="plist"></div>
+    <div class="res">标 P 的由 pose3.json 切换（例如手臂 A/B）</div>
+  </fieldset>
+  <fieldset>
+    <legend>挥手调参</legend>
+    <textarea id="waveCfg" spellcheck="false"></textarea>
+    <div class="row"><button id="wApply">应用并试挥手</button><button id="wCopy">复制配置</button></div>
+    <div class="res" id="wRes"></div>
   </fieldset>
   <fieldset>
     <legend>能力</legend>

@@ -219,6 +219,73 @@
   $("aFile").onchange = () => { const f = $("aFile").files[0]; if (f) playUrl(URL.createObjectURL(f)); };
   $("bUrl").onclick = () => { const u = $("aUrl").value.trim(); if (u) playUrl(u); };
 
+  /* ---------- 参数 / 部件：可拖动固定 ---------- */
+  let listsFor = null;
+  const pinned = { p: new Set(), t: new Set() };
+  function rowHtml(kind, id, min, max, step, tag) {
+    return `<div data-k="${kind}" data-id="${id}"><span title="${id}">${tag || ""}${id}</span>` +
+      `<input type="range" min="${min}" max="${max}" step="${step}"><output></output><input type="checkbox" title="固定"></div>`;
+  }
+  function buildLists(c) {
+    listsFor = c;
+    pinned.p.clear(); pinned.t.clear();
+    const f = $("pFilter").value.trim().toLowerCase();
+    const ps = c.getParameters().filter((p) => !f || p.id.toLowerCase().includes(f));
+    $("params").innerHTML = ps.map((p) => rowHtml("p", p.id, p.min, p.max, (p.max - p.min) / 200 || 0.01)).join("");
+    $("parts").innerHTML = c.getParts().map((p) => rowHtml("t", p.id, 0, 1, 0.01, p.pose ? "P " : "")).join("");
+  }
+  function onRow(ev, release) {
+    const row = ev.target.closest("div[data-id]"); const c = ctl();
+    if (!row || !c) return;
+    const kind = row.dataset.k, id = row.dataset.id, set = pinned[kind];
+    const fn = kind === "p" ? (v) => c.setParameter(id, v) : (v) => c.setPartOpacity(id, v);
+    const cb = row.querySelector("input[type=checkbox]");
+    if (release || (ev.target === cb && !cb.checked)) { set.delete(id); cb.checked = false; row.classList.remove("pin"); fn(null); return; }
+    const v = +row.querySelector("input[type=range]").value;
+    set.add(id); cb.checked = true; row.classList.add("pin");
+    const r = fn(v); if (r && r.ok === false) show("aRes", r);
+  }
+  for (const id of ["params", "parts"]) {
+    $(id).addEventListener("input", (ev) => { if (ev.target.type === "range") onRow(ev); });
+    $(id).addEventListener("change", (ev) => { if (ev.target.type === "checkbox") onRow(ev); });
+  }
+  $("pFilter").oninput = () => { const c = ctl(); if (c) buildLists(c); };
+  $("pFree").onclick = () => {
+    const c = ctl(); if (!c) return;
+    for (const id of pinned.p) c.setParameter(id, null);
+    for (const id of pinned.t) c.setPartOpacity(id, null);
+    buildLists(c);
+  };
+  function renderLists(c) {
+    if (listsFor !== c) buildLists(c);
+    const vals = new Map(c.getParameters().map((p) => [p.id, p.value]));
+    const parts = new Map(c.getParts().map((p) => [p.id, p.opacity]));
+    $("pCount").textContent = `${vals.size} 个`;
+    $("ptCount").textContent = `${parts.size} 个`;
+    for (const row of document.querySelectorAll(".plist div[data-id]")) {
+      const v = row.dataset.k === "p" ? vals.get(row.dataset.id) : parts.get(row.dataset.id);
+      if (v === undefined) continue;
+      row.querySelector("output").textContent = v.toFixed(2);
+      const set = pinned[row.dataset.k];
+      if (!set.has(row.dataset.id) && document.activeElement !== row.querySelector("input[type=range]")) row.querySelector("input[type=range]").value = v;
+    }
+  }
+
+  /* ---------- 挥手调参 ---------- */
+  function fillWave() {
+    const c = ctl();
+    const w = c && c.config && c.config.wave;
+    $("waveCfg").value = w ? JSON.stringify(w, (k, v) => (k === "_说明" ? undefined : v), 2) : "";
+  }
+  $("wApply").onclick = guard("wRes", async (c) => {
+    let w;
+    try { w = JSON.parse($("waveCfg").value || "{}"); } catch (e) { return { ok: false, reason: "JSON 格式错误：" + e.message }; }
+    const r = c.setWaveConfig(w);
+    if (r.ok === false) return r;
+    return c.interact("wave", L.Priority.Force);
+  });
+  $("wCopy").onclick = () => { navigator.clipboard && navigator.clipboard.writeText($("waveCfg").value); show("wRes", { ok: true, reason: "已复制，粘贴到 characters.json 或 config.json 的 wave 字段" }); };
+
   /* ---------- 面板刷新 ---------- */
   function refreshPanel() {
     const c = ctl();
@@ -232,22 +299,15 @@
       $("tx").value = t.x; $("ty").value = t.y; $("ts").value = t.scale;
       for (const id of ["tx", "ty", "ts"]) $(id).nextElementSibling.textContent = (+$(id).value).toFixed(2);
       $("phys").checked = c.model.isPhysicsEnabled(); $("phys").disabled = !caps.physics;
-      for (const b of $("acts").querySelectorAll("button")) b.disabled = !caps[b.dataset.a];
+      for (const b of $("acts").querySelectorAll("button")) b.disabled = !caps[b.dataset.a] && b.dataset.a !== "wave";
+      buildLists(c);
+      fillWave();
     }
   }
 
   setInterval(() => {
     const c = ctl();
-    if (c) {
-      const ps = c.getParameters();
-      $("pCount").textContent = `${ps.length} 个`;
-      $("params").innerHTML = ps.map((p) => {
-        const k = p.max > p.min ? (p.value - p.min) / (p.max - p.min) : 0;
-        const z = p.max > p.min ? (0 - p.min) / (p.max - p.min) : 0;
-        const l = Math.min(k, z) * 100, w = Math.abs(k - z) * 100;
-        return `<div><span title="${p.id}">${p.id}</span><s><b style="left:${l}%;width:${Math.max(1, w)}%"></b></s><output>${p.value.toFixed(2)}</output></div>`;
-      }).join("");
-    } else { $("params").innerHTML = ""; $("pCount").textContent = ""; }
+    if (c) renderLists(c); else { $("params").innerHTML = ""; $("parts").innerHTML = ""; $("pCount").textContent = ""; $("ptCount").textContent = ""; listsFor = null; }
     const lines = cells.map((cell, i) => {
       if (!cell.ctrl) return `#${i + 1} 未加载`;
       const s = cell.ctrl.canvas.getStats();

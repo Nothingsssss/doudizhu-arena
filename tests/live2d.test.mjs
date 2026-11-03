@@ -34,13 +34,19 @@ function loadBundle() {
 const L = loadBundle();
 
 /** 记录写入的假参数表（只用来测试动画逻辑，不是 Live2D 模型） */
-function fakeTarget(ids) {
+function fakeTarget(ids, { ranges = {}, parts = [] } = {}) {
   const vals = new Map(ids.map((i) => [i, 0]));
+  const partVals = new Map(parts.map((p) => [p, 0]));
   const writes = [];
   return {
     vals,
+    partVals,
     writes,
     has: (id) => vals.has(id),
+    range: (id) => (vals.has(id) ? { min: -30, max: 30, def: 0, ...(ranges[id] || {}) } : null),
+    hasPart: (id) => partVals.has(id),
+    setPart: (id, v) => partVals.set(id, v),
+    getPart: (id) => partVals.get(id) || 0,
     add: (id, v, w = 1) => { writes.push(['add', id]); vals.set(id, vals.get(id) + v * w); },
     set: (id, v, w = 1) => { writes.push(['set', id]); vals.set(id, vals.get(id) * (1 - w) + v * w); },
     mul: (id, v, w = 1) => { writes.push(['mul', id]); vals.set(id, vals.get(id) * (1 + (v - 1) * w)); },
@@ -204,16 +210,54 @@ test('手动覆盖头部和眼睛，释放后恢复', () => {
   assert.ok(t.writes.some(([k, id]) => k === 'set' && id === 'ParamEyeLOpen'));
 });
 
-test('挥手：只在模型有对应参数时执行', async () => {
-  const t = fakeTarget([...STD, 'ParamArmRA']);
-  const core = new L.AnimationCore(t, { wave: { param: 'ParamArmRA', from: 0, to: 10 } });
+test('挥手：缺参数或部件时拒绝并列出缺失项', () => {
+  const t = fakeTarget(STD, { parts: ['PartArmA'] });
+  const core = new L.AnimationCore(t, { wave: { param: 'ParamArmRB', showParts: ['PartArmB'] } });
+  assert.equal(core.capabilities().wave, false);
+  const chk = core.checkWave(core.opts.wave);
+  assert.deepEqual([...chk.missing], ['ParamArmRB', 'PartArmB']);
+  assert.equal(core.startWaveParam(core.opts.wave, 2), null);
+});
+
+test('挥手：手臂平滑抬起不跳变，手腕来回摆，部件切换后恢复', async () => {
+  const ids = [...STD, 'ParamArmRB', 'ParamHandRB', 'ParamArmLB'];
+  const t = fakeTarget(ids, { ranges: { ParamArmRB: { min: -10, max: 10 }, ParamHandRB: { min: -10, max: 10 }, ParamArmLB: { min: -10, max: 10 } }, parts: ['PartArmA', 'PartArmB'] });
+  const wave = { showParts: ['PartArmB'], hideParts: ['PartArmA'], param: 'ParamArmRB', to: 3, armSwing: 1.5,
+    swing: { param: 'ParamHandRB', center: 1, amp: 8 }, hold: { ParamArmLB: -10 }, hz: 1.5, duration: 2.6 };
+  const core = new L.AnimationCore(t, { wave });
+  core.idle = false;
   assert.equal(core.capabilities().wave, true);
-  assert.equal(core.startWaveParam({ param: 'ParamArmXX' }, 2), null);
-  const p = core.startWaveParam({ param: 'ParamArmRA', from: 0, to: 10 }, 2);
-  let max = 0;
-  for (let i = 0; i < 130; i++) { t.reset(); core.apply(1 / 60); max = Math.max(max, t.vals.get('ParamArmRA')); }
+  const p = core.startWaveParam(wave, 2);
+  const arm = [], hand = [], partB = [];
+  for (let i = 0; i < 60 * 3.2; i++) {
+    // 模拟每帧动作写入的值：A 套手臂可见，B 套隐藏，RB = -10（放下）
+    t.reset(); t.vals.set('ParamArmRB', -10); t.partVals.set('PartArmA', 1); t.partVals.set('PartArmB', 0);
+    core.apply(1 / 60);
+    arm.push(t.vals.get('ParamArmRB')); hand.push(t.vals.get('ParamHandRB')); partB.push(t.partVals.get('PartArmB'));
+  }
   assert.equal(await p, 'done');
-  assert.ok(max > 6);
+  let jump = 0;
+  for (let i = 1; i < arm.length; i++) jump = Math.max(jump, Math.abs(arm[i] - arm[i - 1]));
+  assert.ok(Math.abs(arm[0] + 10) < 0.5, `第一帧手臂应该还在动作的位置，实际 ${arm[0]}`);
+  assert.ok(jump < 1.2, `手臂单帧变化 ${jump.toFixed(2)}，有跳变`);
+  const mid = arm.slice(60, 120);
+  assert.ok(Math.min(...mid) > 0.5 && Math.max(...mid) < 5, `挥手中手臂 ${Math.min(...mid)}~${Math.max(...mid)}`);
+  const h = hand.slice(40, 130);
+  assert.ok(Math.max(...h) > 7 && Math.min(...h) < -5, `手腕摆动 ${Math.min(...h)}~${Math.max(...h)}`);
+  assert.ok(partB[60] === 1 && t.partVals.get('PartArmA') === 1, '挥手中显示 B 套，结束后换回 A 套');
+  assert.equal(partB[partB.length - 1], 0);
+});
+
+test('调试覆盖：固定参数和部件', () => {
+  const t = fakeTarget(STD, { parts: ['PartArmA'] });
+  const core = new L.AnimationCore(t);
+  core.overrideParam('ParamAngleX', 12);
+  core.overridePart('PartArmA', 0.3);
+  run(core, t, 0.2);
+  assert.equal(t.vals.get('ParamAngleX'), 12);
+  assert.equal(t.partVals.get('PartArmA'), 0.3);
+  core.overrideParam('ParamAngleX', null);
+  assert.equal(core.overriddenParams().size, 0);
 });
 
 test('没有 Cubism Core 时给出明确错误，不会崩溃', async () => {

@@ -24,6 +24,7 @@ define("src/animation", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.AnimationCore = exports.INTERACTIONS = exports.EMOTIONS = exports.P = void 0;
+    exports.checkWave = checkWave;
     exports.P = {
         angleX: 'ParamAngleX',
         angleY: 'ParamAngleY',
@@ -158,6 +159,23 @@ define("src/animation", ["require", "exports"], function (require, exports) {
             return this.x;
         }
     }
+    function checkWave(t, w) {
+        if (!w)
+            return { ok: false, missing: ['wave 配置'] };
+        const missing = [];
+        if (w.param && !t.has(w.param))
+            missing.push(w.param);
+        if (w.swing && !t.has(w.swing.param))
+            missing.push(w.swing.param);
+        for (const id of [...(w.showParts || []), ...(w.hideParts || [])])
+            if (!t.hasPart(id))
+                missing.push(id);
+        for (const id of Object.keys(w.hold || {}))
+            if (!t.has(id))
+                missing.push(id);
+        const drives = (!!w.param && t.has(w.param)) || (!!w.swing && t.has(w.swing.param));
+        return { ok: drives && !missing.length, missing };
+    }
     class AnimationCore {
         constructor(target, opts = {}) {
             var _a;
@@ -180,7 +198,9 @@ define("src/animation", ["require", "exports"], function (require, exports) {
             this.speakPhase = 0;
             this.mouthPrev = 0;
             this.nodKick = 0;
-            this.waveValue = null;
+            this.wave = null;
+            this.overrides = new Map();
+            this.partOverrides = new Map();
             this.rnd = opts.random || Math.random;
             this.idleScale = (_a = opts.idleScale) !== null && _a !== void 0 ? _a : 1;
             this.wander = {
@@ -211,7 +231,7 @@ define("src/animation", ["require", "exports"], function (require, exports) {
                 shake: head || !!((_b = this.opts.motions) === null || _b === void 0 ? void 0 : _b.shake),
                 lowerHead: head || !!((_c = this.opts.motions) === null || _c === void 0 ? void 0 : _c.lowerHead),
                 tilt: head || !!((_d = this.opts.motions) === null || _d === void 0 ? void 0 : _d.tilt),
-                wave: !!(((_e = this.opts.motions) === null || _e === void 0 ? void 0 : _e.wave) || (w && (w.motion || (w.param && t.has(w.param))))),
+                wave: !!(((_e = this.opts.motions) === null || _e === void 0 ? void 0 : _e.wave) || (w && (w.motion || checkWave(t, w).ok))),
                 emotionParams: exports.EMOTIONS.filter((e) => Object.keys({ ...EMOTION_POSE[e], ...EMOTION_FACE[e] }).some((k) => t.has(exports.P[k])))
             };
         }
@@ -241,17 +261,15 @@ define("src/animation", ["require", "exports"], function (require, exports) {
             });
         }
         startWaveParam(cfg, priority) {
-            var _a, _b;
-            if (!cfg.param || !this.target.has(cfg.param))
+            if (!checkWave(this.target, cfg).ok)
                 return null;
             if (this.active && this.active.priority > priority)
                 return null;
             if (this.active)
                 this.active.resolve('interrupted');
-            const from = (_a = cfg.from) !== null && _a !== void 0 ? _a : 0;
-            const to = (_b = cfg.to) !== null && _b !== void 0 ? _b : 1;
-            const param = cfg.param;
-            const dur = 2.0;
+            const dur = cfg.duration && cfg.duration > 0.8 ? cfg.duration : 2.4;
+            const hz = cfg.hz && cfg.hz > 0 ? cfg.hz : 1.6;
+            this.wave = { cfg, t: 0, dur, restore: 0 };
             return new Promise((resolve) => {
                 this.active = {
                     name: 'wave',
@@ -260,13 +278,77 @@ define("src/animation", ["require", "exports"], function (require, exports) {
                     priority,
                     resolve,
                     curve: (t) => {
-                        const k = envelope(t, dur, 0.35, 0.4);
-                        const swing = 0.5 + 0.5 * Math.sin(t * Math.PI * 2 * 1.6);
-                        this.waveValue = { param, v: from + (to - from) * k * (0.65 + 0.35 * swing) };
-                        return { angleZ: 3 * k * Math.sin(t * Math.PI * 2 * 1.6), angleY: 2 * k };
+                        const k = envelope(t, dur, 0.4, 0.5);
+                        return { angleZ: 4 * k * Math.sin(t * Math.PI * 2 * hz), angleY: 2 * k, bodyZ: 2 * k };
                     }
                 };
             });
+        }
+        applyWave(dt) {
+            var _a, _b, _c;
+            const w = this.wave;
+            if (!w)
+                return;
+            const t = this.target;
+            const c = w.cfg;
+            const showP = c.showParts || [];
+            const hideP = c.hideParts || [];
+            if (this.active && this.active.name === 'wave') {
+                w.t += dt;
+                const k = envelope(w.t, w.dur, 0.4, 0.5);
+                const hz = c.hz && c.hz > 0 ? c.hz : 1.6;
+                const ph = Math.sin(w.t * Math.PI * 2 * hz);
+                if (c.param && t.has(c.param)) {
+                    const r = t.range(c.param);
+                    const to = (_a = c.to) !== null && _a !== void 0 ? _a : r.max;
+                    const v = Math.min(r.max, Math.max(r.min, to + (c.armSwing || 0) * ph));
+                    t.set(c.param, v, k);
+                }
+                if (c.swing && t.has(c.swing.param)) {
+                    const r = t.range(c.swing.param);
+                    const center = (_b = c.swing.center) !== null && _b !== void 0 ? _b : (r.min + r.max) / 2;
+                    const amp = (_c = c.swing.amp) !== null && _c !== void 0 ? _c : (r.max - r.min) / 2;
+                    t.set(c.swing.param, Math.min(r.max, Math.max(r.min, center + amp * ph)), k);
+                }
+                for (const [id, v] of Object.entries(c.hold || {})) {
+                    const r = t.range(id);
+                    if (r)
+                        t.set(id, Math.min(r.max, Math.max(r.min, v)), k);
+                }
+                const pk = Math.min(1, k * 2.5);
+                for (const id of showP)
+                    t.setPart(id, Math.max(t.getPart(id), pk));
+                for (const id of hideP)
+                    t.setPart(id, Math.min(t.getPart(id), 1 - pk));
+            }
+            else {
+                w.restore += dt;
+                const k = Math.min(1, w.restore / 0.4);
+                for (const id of showP)
+                    t.setPart(id, Math.min(t.getPart(id), 1 - k));
+                for (const id of hideP)
+                    t.setPart(id, Math.max(t.getPart(id), k));
+                if (k >= 1)
+                    this.wave = null;
+            }
+        }
+        checkWave(w) {
+            return checkWave(this.target, w);
+        }
+        overrideParam(id, v) {
+            if (v === null)
+                this.overrides.delete(id);
+            else
+                this.overrides.set(id, v);
+        }
+        overridePart(id, v) {
+            if (v === null)
+                this.partOverrides.delete(id);
+            else
+                this.partOverrides.set(id, v);
+        }
+        overriddenParams() {
+            return this.overrides;
         }
         cancelInteraction() {
             if (this.active)
@@ -315,7 +397,7 @@ define("src/animation", ["require", "exports"], function (require, exports) {
                 if (EMOTION_EYE[e])
                     eyeMul *= 1 + (EMOTION_EYE[e] - 1) * w;
             }
-            let wave = null;
+            this.applyWave(dt);
             if (this.active) {
                 const a = this.active;
                 a.t += dt;
@@ -323,11 +405,8 @@ define("src/animation", ["require", "exports"], function (require, exports) {
                 const env = a.name === 'nod' || a.name === 'shake' ? envelope(a.t, a.dur, 0.08, 0.2) : 1;
                 for (const [k, v] of Object.entries(pose))
                     add(k, v * env);
-                if (a.name === 'wave')
-                    wave = this.waveValue;
                 if (a.t >= a.dur) {
                     this.active = null;
-                    this.waveValue = null;
                     a.resolve('done');
                 }
             }
@@ -351,8 +430,6 @@ define("src/animation", ["require", "exports"], function (require, exports) {
                 if (t.has(exports.P[pk]))
                     t.add(exports.P[pk], v);
             }
-            if (wave && t.has(wave.param))
-                t.set(wave.param, wave.v, 1);
             this.eyeW += ((this.eyeOverride !== null ? 1 : 0) - this.eyeW) * (1 - Math.exp(-dt / 0.12));
             for (const id of [exports.P.eyeLOpen, exports.P.eyeROpen]) {
                 if (!t.has(id))
@@ -362,6 +439,12 @@ define("src/animation", ["require", "exports"], function (require, exports) {
                 if (this.eyeW > 0.001)
                     t.set(id, this.lastEye, this.eyeW);
             }
+            for (const [id, v] of this.overrides)
+                if (t.has(id))
+                    t.set(id, v, 1);
+            for (const [id, v] of this.partOverrides)
+                if (t.hasPart(id))
+                    t.setPart(id, v);
         }
         destroy() {
             this.cancelInteraction();
@@ -11469,7 +11552,7 @@ define("framework/src/motion/cubismlipsyncupdater", ["require", "exports", "fram
         Live2DCubismFramework.CubismLipSyncUpdater = $.CubismLipSyncUpdater;
     })(Live2DCubismFramework || (exports.Live2DCubismFramework = Live2DCubismFramework = {}));
 });
-define("src/model", ["require", "exports", "framework/src/cubismdefaultparameterid", "framework/src/cubismmodelsettingjson", "framework/src/effect/cubismbreath", "framework/src/effect/cubismeyeblink", "framework/src/effect/cubismlook", "framework/src/live2dcubismframework", "framework/src/model/cubismmoc", "framework/src/model/cubismusermodel", "framework/src/motion/acubismmotion", "framework/src/motion/cubismmotionqueuemanager", "framework/src/motion/cubismupdatescheduler", "framework/src/motion/cubismeyeblinkupdater", "framework/src/motion/cubismexpressionupdater", "framework/src/motion/cubismlookupdater", "framework/src/motion/cubismbreathupdater", "framework/src/motion/cubismphysicsupdater", "framework/src/motion/cubismposeupdater", "framework/src/motion/cubismlipsyncupdater", "src/core"], function (require, exports, cubismdefaultparameterid_1, cubismmodelsettingjson_1, cubismbreath_2, cubismeyeblink_2, cubismlook_1, live2dcubismframework_17, cubismmoc_2, cubismusermodel_1, acubismmotion_4, cubismmotionqueuemanager_3, cubismupdatescheduler_1, cubismeyeblinkupdater_1, cubismexpressionupdater_1, cubismlookupdater_1, cubismbreathupdater_1, cubismphysicsupdater_1, cubismposeupdater_1, cubismlipsyncupdater_1, core_2) {
+define("src/model", ["require", "exports", "framework/src/cubismdefaultparameterid", "framework/src/cubismmodelsettingjson", "framework/src/effect/cubismbreath", "framework/src/effect/cubismeyeblink", "framework/src/effect/cubismlook", "framework/src/live2dcubismframework", "framework/src/model/cubismmoc", "framework/src/model/cubismusermodel", "framework/src/motion/acubismmotion", "framework/src/motion/cubismmotionqueuemanager", "framework/src/motion/cubismupdatescheduler", "framework/src/motion/cubismeyeblinkupdater", "framework/src/motion/cubismexpressionupdater", "framework/src/motion/cubismlookupdater", "framework/src/motion/cubismbreathupdater", "framework/src/motion/cubismphysicsupdater", "framework/src/motion/cubismposeupdater", "framework/src/motion/cubismlipsyncupdater", "framework/src/rendering/cubismshader_webgl", "src/core"], function (require, exports, cubismdefaultparameterid_1, cubismmodelsettingjson_1, cubismbreath_2, cubismeyeblink_2, cubismlook_1, live2dcubismframework_17, cubismmoc_2, cubismusermodel_1, acubismmotion_4, cubismmotionqueuemanager_3, cubismupdatescheduler_1, cubismeyeblinkupdater_1, cubismexpressionupdater_1, cubismlookupdater_1, cubismbreathupdater_1, cubismphysicsupdater_1, cubismposeupdater_1, cubismlipsyncupdater_1, cubismshader_webgl_2, core_2) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.Live2DModel = exports.idOf = exports.Priority = void 0;
@@ -11501,6 +11584,7 @@ define("src/model", ["require", "exports", "framework/src/cubismdefaultparameter
             this.physicsOn = true;
             this.shaderPath = 'live2d/shaders/WebGL/';
             this.released = false;
+            this.posePartCache = null;
             this.pendingMotions = [];
             this.currentMotion = '';
             this.idleGroup = '';
@@ -11667,6 +11751,7 @@ define("src/model", ["require", "exports", "framework/src/cubismdefaultparameter
                     renderer.bindTexture(i, tex);
                 }
                 renderer.loadShaders(this.shaderPath);
+                await this.waitShaders(gl);
                 this.scheduler.sortUpdatableList();
                 this.finalizeCaps();
                 this.setInitialized(true);
@@ -11676,6 +11761,27 @@ define("src/model", ["require", "exports", "framework/src/cubismdefaultparameter
                 this.release();
                 throw e;
             }
+        }
+        waitShaders(gl, timeoutMs = 15000) {
+            const shader = cubismshader_webgl_2.CubismShaderManager_WebGL.getInstance().getShader(gl);
+            if (!shader)
+                return Promise.reject(new Error('着色器管理器没有初始化'));
+            const t0 = performance.now();
+            return new Promise((resolve, reject) => {
+                const poll = () => {
+                    if (this.released)
+                        return reject(new Error('模型已释放'));
+                    if (shader._isShaderLoaded)
+                        return resolve();
+                    if (!shader._isShaderLoading) {
+                        return reject(new Error(`着色器加载失败，请检查 ${this.shaderPath} 下的 .vert/.frag 文件是否可访问`));
+                    }
+                    if (performance.now() - t0 > timeoutMs)
+                        return reject(new Error(`着色器加载超时（${this.shaderPath}）`));
+                    setTimeout(poll, 16);
+                };
+                poll();
+            });
         }
         detectCapabilities(mocVersion) {
             const m = this._model;
@@ -11717,6 +11823,39 @@ define("src/model", ["require", "exports", "framework/src/cubismdefaultparameter
             this.caps.expressions = [...this.expressionsLoaded.keys()];
             this.caps.eyeBlinkIds = this.eyeBlinkIds.map(idStr);
             this.caps.lipSyncIds = this.lipSyncIds.map(idStr);
+        }
+        hasPart(id) {
+            return !!this.caps && this.caps.parts.includes(id);
+        }
+        posePartIds() {
+            var _a;
+            if (this.posePartCache)
+                return this.posePartCache;
+            const out = new Set();
+            const groups = ((_a = this._pose) === null || _a === void 0 ? void 0 : _a._partGroups) || [];
+            for (const g of groups)
+                if (g && g.partId)
+                    out.add(idStr(g.partId));
+            this.posePartCache = out;
+            return out;
+        }
+        setPartOpacity(id, v) {
+            if (!this.hasPart(id))
+                return;
+            if (this.posePartIds().has(id))
+                this._model.setParameterValueById((0, exports.idOf)(id), v);
+            else
+                this._model.setPartOpacityById((0, exports.idOf)(id), v);
+        }
+        getPartOpacity(id) {
+            if (!this.hasPart(id))
+                return 0;
+            if (this.posePartIds().has(id))
+                return this._model.getParameterValueById((0, exports.idOf)(id));
+            return this._model.getPartOpacityById((0, exports.idOf)(id));
+        }
+        getPartRenderOpacity(id) {
+            return this.hasPart(id) ? this._model.getPartOpacityById((0, exports.idOf)(id)) : 0;
         }
         hasParam(id) {
             if (this.caps)
@@ -11912,7 +12051,7 @@ define("src/model", ["require", "exports", "framework/src/cubismdefaultparameter
     }
     exports.Live2DModel = Live2DModel;
 });
-define("src/canvas", ["require", "exports", "framework/src/math/cubismmatrix44", "framework/src/rendering/cubismshader_webgl", "src/assets", "src/core", "src/model"], function (require, exports, cubismmatrix44_5, cubismshader_webgl_2, assets_1, core_3, model_1) {
+define("src/canvas", ["require", "exports", "framework/src/math/cubismmatrix44", "framework/src/rendering/cubismshader_webgl", "src/assets", "src/core", "src/model"], function (require, exports, cubismmatrix44_5, cubismshader_webgl_3, assets_1, core_3, model_1) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.Live2DCanvas = void 0;
@@ -12205,7 +12344,7 @@ define("src/canvas", ["require", "exports", "framework/src/math/cubismmatrix44",
             const gl = this.gl;
             if (gl) {
                 try {
-                    const mgr = cubismshader_webgl_2.CubismShaderManager_WebGL.getInstance();
+                    const mgr = cubismshader_webgl_3.CubismShaderManager_WebGL.getInstance();
                     const map = mgr._shaderMap;
                     const sh = map === null || map === void 0 ? void 0 : map.get(gl);
                     if (sh) {
@@ -12235,6 +12374,20 @@ define("src/controller", ["require", "exports", "framework/src/motion/icubismupd
         }
         has(id) {
             return this.m.hasParam(id);
+        }
+        range(id) {
+            var _a;
+            const p = (_a = this.m.caps) === null || _a === void 0 ? void 0 : _a.params.get(id);
+            return p ? { min: p.min, max: p.max, def: p.def } : null;
+        }
+        hasPart(id) {
+            return this.m.hasPart(id);
+        }
+        setPart(id, v) {
+            this.m.setPartOpacity(id, v);
+        }
+        getPart(id) {
+            return this.m.getPartOpacity(id);
         }
         model() {
             return this.m.getModel();
@@ -12459,9 +12612,10 @@ define("src/controller", ["require", "exports", "framework/src/motion/icubismupd
                 const w = (_c = this.config) === null || _c === void 0 ? void 0 : _c.wave;
                 if (w === null || w === void 0 ? void 0 : w.motion)
                     return this.playMotion(w.motion, priority);
-                if (w === null || w === void 0 ? void 0 : w.param) {
-                    if (!m.hasParam(w.param))
-                        return { ok: false, reason: `模型没有挥手用的参数 ${w.param}` };
+                if ((w === null || w === void 0 ? void 0 : w.param) || (w === null || w === void 0 ? void 0 : w.swing)) {
+                    const chk = anim.checkWave(w);
+                    if (!chk.ok)
+                        return { ok: false, reason: `挥手配置里这些参数/部件模型没有：${chk.missing.join('、')}` };
                     const p = anim.startWaveParam(w, priority);
                     if (!p)
                         return { ok: false, reason: '优先级更高的动作正在执行' };
@@ -12492,6 +12646,44 @@ define("src/controller", ["require", "exports", "framework/src/motion/icubismupd
             };
             this.anim.setHead(lim(animation_2.P.angleX, x), lim(animation_2.P.angleY, y), lim(animation_2.P.angleZ, z));
             return { ok: true, via: 'parameters' };
+        }
+        setWaveConfig(w) {
+            if (!w || typeof w !== 'object')
+                throw new TypeError('wave 配置必须是对象');
+            this.need();
+            if (!this.config)
+                throw new Error('模型还没加载完成');
+            const chk = this.anim.checkWave(w);
+            this.config.wave = w;
+            this.anim.opts.wave = w;
+            return chk.ok || w.motion ? { ok: true } : { ok: false, reason: `模型没有：${chk.missing.join('、')}` };
+        }
+        setParameter(id, value) {
+            const m = this.need();
+            if (!m.hasParam(id))
+                return { ok: false, reason: `模型没有参数 ${id}` };
+            if (value !== null) {
+                num('value', value);
+                const r = m.caps.params.get(id);
+                value = clamp(value, r.min, r.max);
+            }
+            this.anim.overrideParam(id, value);
+            return { ok: true, via: 'parameters' };
+        }
+        setPartOpacity(id, value) {
+            const m = this.need();
+            if (!m.hasPart(id))
+                return { ok: false, reason: `模型没有部件 ${id}` };
+            if (value !== null)
+                value = clamp(num('value', value), 0, 1);
+            this.anim.overridePart(id, value);
+            return { ok: true };
+        }
+        getParts() {
+            const m = this.model;
+            if (!m || !m.ready || !m.caps)
+                return [];
+            return m.caps.parts.map((id) => ({ id, opacity: m.getPartRenderOpacity(id), pose: m.posePartIds().has(id) }));
         }
         clearHeadAngle() {
             var _a;

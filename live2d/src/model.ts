@@ -32,6 +32,7 @@ import { CubismPoseUpdater } from '../framework/src/motion/cubismposeupdater';
 import { CubismLipSyncUpdater } from '../framework/src/motion/cubismlipsyncupdater';
 import { ICubismUpdater } from '../framework/src/motion/icubismupdater';
 import { IParameterProvider } from '../framework/src/motion/iparameterprovider';
+import { CubismShaderManager_WebGL } from '../framework/src/rendering/cubismshader_webgl';
 import { Live2DAssetManager } from './assets';
 import { log } from './core';
 
@@ -92,6 +93,7 @@ export class Live2DModel extends CubismUserModel {
   private physicsOn = true;
   private shaderPath = 'live2d/shaders/WebGL/';
   private released = false;
+  private posePartCache: Set<string> | null = null;
   private pendingMotions: Array<{ h: CubismMotionQueueEntryHandle; key: string; resolve: (ok: boolean) => void }> = [];
   /** 当前播放的 motion 名（group_index），给调试和动画管理器用 */
   currentMotion = '';
@@ -287,6 +289,8 @@ export class Live2DModel extends CubismUserModel {
         renderer.bindTexture(i, tex);
       }
       renderer.loadShaders(this.shaderPath);
+      // 官方渲染器会异步 fetch 着色器文件；等它编译完再标记就绪，避免第一帧 "Shader program is not initialized"
+      await this.waitShaders(gl);
 
       this.scheduler.sortUpdatableList();
       this.finalizeCaps();
@@ -296,6 +300,24 @@ export class Live2DModel extends CubismUserModel {
       this.release();
       throw e;
     }
+  }
+
+  private waitShaders(gl: WebGLRenderingContext | WebGL2RenderingContext, timeoutMs = 15000): Promise<void> {
+    const shader: any = CubismShaderManager_WebGL.getInstance().getShader(gl as WebGLRenderingContext);
+    if (!shader) return Promise.reject(new Error('着色器管理器没有初始化'));
+    const t0 = performance.now();
+    return new Promise((resolve, reject) => {
+      const poll = () => {
+        if (this.released) return reject(new Error('模型已释放'));
+        if (shader._isShaderLoaded) return resolve();
+        if (!shader._isShaderLoading) {
+          return reject(new Error(`着色器加载失败，请检查 ${this.shaderPath} 下的 .vert/.frag 文件是否可访问`));
+        }
+        if (performance.now() - t0 > timeoutMs) return reject(new Error(`着色器加载超时（${this.shaderPath}）`));
+        setTimeout(poll, 16);
+      };
+      poll();
+    });
   }
 
   private detectCapabilities(mocVersion: number): ModelCapabilities {
@@ -337,6 +359,34 @@ export class Live2DModel extends CubismUserModel {
     this.caps.expressions = [...this.expressionsLoaded.keys()];
     this.caps.eyeBlinkIds = this.eyeBlinkIds.map(idStr);
     this.caps.lipSyncIds = this.lipSyncIds.map(idStr);
+  }
+
+  hasPart(id: string): boolean {
+    return !!this.caps && this.caps.parts.includes(id);
+  }
+  /** 由 pose3.json 管理的部件（例如手臂 A/B）。这些部件的显示由同名虚拟参数决定，姿势更新器负责淡入淡出 */
+  posePartIds(): Set<string> {
+    if (this.posePartCache) return this.posePartCache;
+    const out = new Set<string>();
+    const groups: any[] = (this._pose as any)?._partGroups || [];
+    for (const g of groups) if (g && g.partId) out.add(idStr(g.partId));
+    this.posePartCache = out;
+    return out;
+  }
+  /** 设置部件可见度：普通部件直接改透明度；姿势部件改它的切换参数（和 motion3 的 PartOpacity 曲线做法一致） */
+  setPartOpacity(id: string, v: number): void {
+    if (!this.hasPart(id)) return;
+    if (this.posePartIds().has(id)) this._model.setParameterValueById(idOf(id), v);
+    else this._model.setPartOpacityById(idOf(id), v);
+  }
+  getPartOpacity(id: string): number {
+    if (!this.hasPart(id)) return 0;
+    if (this.posePartIds().has(id)) return this._model.getParameterValueById(idOf(id));
+    return this._model.getPartOpacityById(idOf(id));
+  }
+  /** 部件实际透明度（调试显示用） */
+  getPartRenderOpacity(id: string): number {
+    return this.hasPart(id) ? this._model.getPartOpacityById(idOf(id)) : 0;
   }
 
   hasParam(id: string): boolean {

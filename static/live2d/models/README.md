@@ -40,9 +40,28 @@ static/live2d/models/deepseek/
 | 眼球 | `ParamEyeBallX` `ParamEyeBallY` |
 | 口型（在 LipSync 组里登记） | `ParamMouthOpenY` |
 | 嘴形 / 笑眼 / 眉毛 / 脸红（没有表情文件时用于情绪） | `ParamMouthForm` `ParamEyeLSmile` `ParamEyeRSmile` `ParamBrowLY` `ParamBrowRY` `ParamBrowLForm` `ParamBrowRForm` `ParamBrowLAngle` `ParamBrowRAngle` `ParamCheek` |
-| 挥手 | 自定义手臂参数（在配置里写 `"wave": {"param": "ParamArmRA", "from": 0, "to": 10}`）或做一个 Wave 动作 |
+| 挥手 | 做一个 Wave 动作（`"motions": {"wave": "Wave"}`），或用参数驱动，见下方 |
 
 头发、衣服、饰品的摆动由 `physics3.json` 完成，输入接上 `ParamAngleX/Z`、`ParamBodyAngleX/Z` 即可跟着头和身体动。
+
+## 参数驱动的挥手
+
+```json
+"wave": {
+  "param": "ParamArmRB", "to": 3, "armSwing": 1.5,
+  "swing": { "param": "ParamHandRB", "center": 1, "amp": 8 },
+  "showParts": ["PartArmB"], "hideParts": ["PartArmA"],
+  "hold": { "ParamArmLB": -10 },
+  "hz": 1.5, "duration": 2.6
+}
+```
+
+- `param` / `to`：抬手臂的参数和目标值（不写 `to` 用参数最大值），从当前动作的姿势平滑过渡过去
+- `swing`：手腕或前臂来回摆，`center ± amp`
+- `showParts` / `hideParts`：手臂有两套、由 pose3.json 切换时用（改的是部件的切换参数，淡入淡出由官方姿势更新器完成）
+- `hold`：挥手时固定其他参数，例如另一只手臂放下
+
+数值在调试页「挥手调参」里改了直接试，「参数」「部件」两栏可以拖动滑块找姿势。
 
 ## 官方示例模型
 

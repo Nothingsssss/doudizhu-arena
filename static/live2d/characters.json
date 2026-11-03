@@ -9,9 +9,40 @@
       "scale": 1.0,
       "x": 0,
       "y": 0,
-      "motions": { "idle": "Idle" },
-      "wave": { "param": "ParamArmRA", "from": 0, "to": 10 },
-      "params": ["ParamAngleX", "ParamAngleY", "ParamAngleZ", "ParamEyeLOpen", "ParamEyeROpen", "ParamMouthOpenY", "ParamBodyAngleX"]
+      "motions": {
+        "idle": "Idle"
+      },
+      "wave": {
+        "_说明": "Hiyori 的手臂有 A（自然下垂）/B（抬起弯曲）两套，由 pose3.json 切换。ParamArmRA 是 A 套，只能小幅外摆；挥手改用 B 套：显示 PartArmB，抬右臂 ParamArmRB，来回转右手 ParamHandRB，左臂 B 放下。数值参考官方动作 Hiyori_m06/m08 的取值。",
+        "showParts": [
+          "PartArmB"
+        ],
+        "hideParts": [
+          "PartArmA"
+        ],
+        "param": "ParamArmRB",
+        "to": 3,
+        "armSwing": 1.5,
+        "swing": {
+          "param": "ParamHandRB",
+          "center": 1,
+          "amp": 8
+        },
+        "hold": {
+          "ParamArmLB": -10
+        },
+        "hz": 1.5,
+        "duration": 2.6
+      },
+      "params": [
+        "ParamAngleX",
+        "ParamAngleY",
+        "ParamAngleZ",
+        "ParamEyeLOpen",
+        "ParamEyeROpen",
+        "ParamMouthOpenY",
+        "ParamBodyAngleX"
+      ]
     },
     {
       "id": "mao",
@@ -31,8 +62,18 @@
         "surprised": "exp_07",
         "angry": "exp_08"
       },
-      "motions": { "idle": "Idle" },
-      "params": ["ParamAngleX", "ParamAngleY", "ParamAngleZ", "ParamEyeLOpen", "ParamEyeROpen", "ParamA", "ParamBodyAngleX"]
+      "motions": {
+        "idle": "Idle"
+      },
+      "params": [
+        "ParamAngleX",
+        "ParamAngleY",
+        "ParamAngleZ",
+        "ParamEyeLOpen",
+        "ParamEyeROpen",
+        "ParamA",
+        "ParamBodyAngleX"
+      ]
     }
   ]
 }

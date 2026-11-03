@@ -51,6 +51,19 @@ class ModelTarget implements ParamTarget {
   has(id: string): boolean {
     return this.m.hasParam(id);
   }
+  range(id: string): { min: number; max: number; def: number } | null {
+    const p = this.m.caps?.params.get(id);
+    return p ? { min: p.min, max: p.max, def: p.def } : null;
+  }
+  hasPart(id: string): boolean {
+    return this.m.hasPart(id);
+  }
+  setPart(id: string, v: number): void {
+    this.m.setPartOpacity(id, v);
+  }
+  getPart(id: string): number {
+    return this.m.getPartOpacity(id);
+  }
   private model(): CubismModel {
     return this.m.getModel();
   }
@@ -269,8 +282,9 @@ export class Live2DController {
     if (name === 'wave') {
       const w = this.config?.wave;
       if (w?.motion) return this.playMotion(w.motion, priority);
-      if (w?.param) {
-        if (!m.hasParam(w.param)) return { ok: false, reason: `模型没有挥手用的参数 ${w.param}` };
+      if (w?.param || w?.swing) {
+        const chk = anim.checkWave(w);
+        if (!chk.ok) return { ok: false, reason: `挥手配置里这些参数/部件模型没有：${chk.missing.join('、')}` };
         const p = anim.startWaveParam(w, priority);
         if (!p) return { ok: false, reason: '优先级更高的动作正在执行' };
         return { ok: true, via: 'parameters', result: await p };
@@ -298,6 +312,45 @@ export class Live2DController {
     };
     this.anim!.setHead(lim(P.angleX, x), lim(P.angleY, y), lim(P.angleZ, z));
     return { ok: true, via: 'parameters' };
+  }
+
+  /** 修改挥手配置（调试时调参用），返回检查结果 */
+  setWaveConfig(w: WaveConfig): ActionResult {
+    if (!w || typeof w !== 'object') throw new TypeError('wave 配置必须是对象');
+    this.need();
+    if (!this.config) throw new Error('模型还没加载完成');
+    const chk = this.anim!.checkWave(w);
+    this.config.wave = w;
+    (this.anim!.opts as AnimationOptions).wave = w;
+    return chk.ok || w.motion ? { ok: true } : { ok: false, reason: `模型没有：${chk.missing.join('、')}` };
+  }
+
+  /** 调试：把某个参数固定为 value（null 取消），会覆盖动作和动画 */
+  setParameter(id: string, value: number | null): ActionResult {
+    const m = this.need();
+    if (!m.hasParam(id)) return { ok: false, reason: `模型没有参数 ${id}` };
+    if (value !== null) {
+      num('value', value);
+      const r = m.caps!.params.get(id)!;
+      value = clamp(value, r.min, r.max);
+    }
+    this.anim!.overrideParam(id, value);
+    return { ok: true, via: 'parameters' };
+  }
+
+  /** 调试：固定部件透明度（null 取消） */
+  setPartOpacity(id: string, value: number | null): ActionResult {
+    const m = this.need();
+    if (!m.hasPart(id)) return { ok: false, reason: `模型没有部件 ${id}` };
+    if (value !== null) value = clamp(num('value', value), 0, 1);
+    this.anim!.overridePart(id, value);
+    return { ok: true };
+  }
+
+  getParts(): Array<{ id: string; opacity: number; pose: boolean }> {
+    const m = this.model;
+    if (!m || !m.ready || !m.caps) return [];
+    return m.caps.parts.map((id) => ({ id, opacity: m.getPartRenderOpacity(id), pose: m.posePartIds().has(id) }));
   }
 
   clearHeadAngle(): void {

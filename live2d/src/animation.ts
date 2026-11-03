@@ -16,6 +16,11 @@
 
 export interface ParamTarget {
   has(id: string): boolean;
+  /** 参数范围（模型里实际的最小/最大/默认值）；没有这个参数返回 null */
+  range(id: string): { min: number; max: number; def: number } | null;
+  hasPart(id: string): boolean;
+  setPart(id: string, opacity: number): void;
+  getPart(id: string): number;
   add(id: string, v: number, w?: number): void;
   set(id: string, v: number, w?: number): void;
   mul(id: string, v: number, w?: number): void;
@@ -183,12 +188,39 @@ class Smooth {
 }
 
 export interface WaveConfig {
-  /** 用模型自带动作实现，例如 "TapBody" 或 "TapBody_0" */
+  /** 用模型自带动作实现，例如 "TapBody" 或 "TapBody_0"（写了就优先用动作） */
   motion?: string;
-  /** 或者用手臂参数实现 */
+  /** 抬手臂的参数，例如 "ParamArmRB" */
   param?: string;
+  /** 旧配置兼容字段，已不使用：手臂从当前动作的值平滑过渡过去，不会从 from 跳变 */
   from?: number;
+  /** 手臂抬到的值；不写用参数最大值 */
   to?: number;
+  /** 挥手时手臂自身的来回摆动幅度（参数值），默认 0 */
+  armSwing?: number;
+  /** 摆手（手腕/前臂）参数：在 center ± amp 之间来回，默认整个参数范围 */
+  swing?: { param: string; amp?: number; center?: number };
+  /** 摆动频率（次/秒），默认 1.6 */
+  hz?: number;
+  /** 总时长（秒），默认 2.4 */
+  duration?: number;
+  /** 挥手时要显示 / 隐藏的部件（模型的手臂有 A/B 两套、由 pose3.json 切换时用），例如 Hiyori：show PartArmB、hide PartArmA */
+  showParts?: string[];
+  hideParts?: string[];
+  /** 挥手期间固定的其他参数，例如另一只手臂放下：{ "ParamArmLB": -10 } */
+  hold?: Record<string, number>;
+}
+
+/** 检查挥手配置在这个模型上能不能用，返回缺失项 */
+export function checkWave(t: ParamTarget, w: WaveConfig | undefined): { ok: boolean; missing: string[] } {
+  if (!w) return { ok: false, missing: ['wave 配置'] };
+  const missing: string[] = [];
+  if (w.param && !t.has(w.param)) missing.push(w.param);
+  if (w.swing && !t.has(w.swing.param)) missing.push(w.swing.param);
+  for (const id of [...(w.showParts || []), ...(w.hideParts || [])]) if (!t.hasPart(id)) missing.push(id);
+  for (const id of Object.keys(w.hold || {})) if (!t.has(id)) missing.push(id);
+  const drives = (!!w.param && t.has(w.param)) || (!!w.swing && t.has(w.swing.param));
+  return { ok: drives && !missing.length, missing };
 }
 
 export interface AnimationOptions {
@@ -229,7 +261,9 @@ export class AnimationCore {
   private speakPhase = 0;
   private mouthPrev = 0;
   private nodKick = 0;
-  private waveValue: { param: string; v: number } | null = null;
+  private wave: { cfg: WaveConfig; t: number; dur: number; restore: number } | null = null;
+  private overrides = new Map<string, number>();
+  private partOverrides = new Map<string, number>();
   private rnd: () => number;
   idleScale: number;
 
@@ -263,7 +297,7 @@ export class AnimationCore {
       shake: head || !!this.opts.motions?.shake,
       lowerHead: head || !!this.opts.motions?.lowerHead,
       tilt: head || !!this.opts.motions?.tilt,
-      wave: !!(this.opts.motions?.wave || (w && (w.motion || (w.param && t.has(w.param))))),
+      wave: !!(this.opts.motions?.wave || (w && (w.motion || checkWave(t, w).ok))),
       emotionParams: EMOTIONS.filter((e) =>
         Object.keys({ ...EMOTION_POSE[e], ...EMOTION_FACE[e] }).some((k) => t.has(P[k as keyof typeof P]))
       ) as unknown as string[]
@@ -296,15 +330,17 @@ export class AnimationCore {
     });
   }
 
-  /** 手臂参数挥手 */
+  /**
+   * 参数挥手：手臂平滑抬起（从当前动作的姿势过渡，不跳变）→ 手腕来回摆 → 放下。
+   * 需要的参数或部件模型里没有时返回 null（调用方用 checkWave 拿缺失项）。
+   */
   startWaveParam(cfg: WaveConfig, priority: number): Promise<'done' | 'interrupted'> | null {
-    if (!cfg.param || !this.target.has(cfg.param)) return null;
+    if (!checkWave(this.target, cfg).ok) return null;
     if (this.active && this.active.priority > priority) return null;
     if (this.active) this.active.resolve('interrupted');
-    const from = cfg.from ?? 0;
-    const to = cfg.to ?? 1;
-    const param = cfg.param;
-    const dur = 2.0;
+    const dur = cfg.duration && cfg.duration > 0.8 ? cfg.duration : 2.4;
+    const hz = cfg.hz && cfg.hz > 0 ? cfg.hz : 1.6;
+    this.wave = { cfg, t: 0, dur, restore: 0 };
     return new Promise((resolve) => {
       this.active = {
         name: 'wave',
@@ -313,13 +349,72 @@ export class AnimationCore {
         priority,
         resolve,
         curve: (t) => {
-          const k = envelope(t, dur, 0.35, 0.4);
-          const swing = 0.5 + 0.5 * Math.sin(t * Math.PI * 2 * 1.6);
-          this.waveValue = { param, v: from + (to - from) * k * (0.65 + 0.35 * swing) };
-          return { angleZ: 3 * k * Math.sin(t * Math.PI * 2 * 1.6), angleY: 2 * k };
+          const k = envelope(t, dur, 0.4, 0.5);
+          // 头跟着手轻轻歪，身体略微侧过来
+          return { angleZ: 4 * k * Math.sin(t * Math.PI * 2 * hz), angleY: 2 * k, bodyZ: 2 * k };
         }
       };
     });
+  }
+
+  /** 每帧写入挥手的手臂/手腕参数和部件透明度（在动作之后、姿势和物理之前） */
+  private applyWave(dt: number): void {
+    const w = this.wave;
+    if (!w) return;
+    const t = this.target;
+    const c = w.cfg;
+    const showP = c.showParts || [];
+    const hideP = c.hideParts || [];
+    if (this.active && this.active.name === 'wave') {
+      w.t += dt;
+      const k = envelope(w.t, w.dur, 0.4, 0.5);
+      const hz = c.hz && c.hz > 0 ? c.hz : 1.6;
+      const ph = Math.sin(w.t * Math.PI * 2 * hz);
+      if (c.param && t.has(c.param)) {
+        const r = t.range(c.param)!;
+        const to = c.to ?? r.max;
+        const v = Math.min(r.max, Math.max(r.min, to + (c.armSwing || 0) * ph));
+        t.set(c.param, v, k); // 按权重和动作的值混合：抬起和放下都是平滑的
+      }
+      if (c.swing && t.has(c.swing.param)) {
+        const r = t.range(c.swing.param)!;
+        const center = c.swing.center ?? (r.min + r.max) / 2;
+        const amp = c.swing.amp ?? (r.max - r.min) / 2;
+        t.set(c.swing.param, Math.min(r.max, Math.max(r.min, center + amp * ph)), k);
+      }
+      for (const [id, v] of Object.entries(c.hold || {})) {
+        const r = t.range(id);
+        if (r) t.set(id, Math.min(r.max, Math.max(r.min, v)), k);
+      }
+      // 部件切换要比手臂动作早一点完成，不然会看到两套手臂叠在一起
+      const pk = Math.min(1, k * 2.5);
+      for (const id of showP) t.setPart(id, Math.max(t.getPart(id), pk));
+      for (const id of hideP) t.setPart(id, Math.min(t.getPart(id), 1 - pk));
+    } else {
+      // 结束或被打断：如果动作本身不控制这些部件，在 0.4 秒内换回去
+      w.restore += dt;
+      const k = Math.min(1, w.restore / 0.4);
+      for (const id of showP) t.setPart(id, Math.min(t.getPart(id), 1 - k));
+      for (const id of hideP) t.setPart(id, Math.max(t.getPart(id), k));
+      if (k >= 1) this.wave = null;
+    }
+  }
+
+  checkWave(w: WaveConfig | undefined): { ok: boolean; missing: string[] } {
+    return checkWave(this.target, w);
+  }
+
+  /** 调试：固定某个参数的值（null 取消） */
+  overrideParam(id: string, v: number | null): void {
+    if (v === null) this.overrides.delete(id);
+    else this.overrides.set(id, v);
+  }
+  overridePart(id: string, v: number | null): void {
+    if (v === null) this.partOverrides.delete(id);
+    else this.partOverrides.set(id, v);
+  }
+  overriddenParams(): Map<string, number> {
+    return this.overrides;
   }
 
   cancelInteraction(): void {
@@ -373,17 +468,15 @@ export class AnimationCore {
     }
 
     // 4. 互动动作
-    let wave: { param: string; v: number } | null = null;
+    this.applyWave(dt);
     if (this.active) {
       const a = this.active;
       a.t += dt;
       const pose = a.curve(a.t);
       const env = a.name === 'nod' || a.name === 'shake' ? envelope(a.t, a.dur, 0.08, 0.2) : 1;
       for (const [k, v] of Object.entries(pose)) add(k, (v as number) * env);
-      if (a.name === 'wave') wave = this.waveValue;
       if (a.t >= a.dur) {
         this.active = null;
-        this.waveValue = null;
         a.resolve('done');
       }
     }
@@ -408,7 +501,6 @@ export class AnimationCore {
       const pk = k.slice(5) as keyof typeof P;
       if (t.has(P[pk])) t.add(P[pk], v);
     }
-    if (wave && t.has(wave.param)) t.set(wave.param, wave.v, 1);
 
     // 眼睛：情绪倍率 + 手动覆盖（在官方眨眼之后执行，所以眨眼仍然有效）
     this.eyeW += ((this.eyeOverride !== null ? 1 : 0) - this.eyeW) * (1 - Math.exp(-dt / 0.12));
@@ -417,6 +509,10 @@ export class AnimationCore {
       if (Math.abs(eyeMul - 1) > 0.001) t.mul(id, eyeMul);
       if (this.eyeW > 0.001) t.set(id, this.lastEye, this.eyeW);
     }
+
+    // 调试覆盖最后写入
+    for (const [id, v] of this.overrides) if (t.has(id)) t.set(id, v, 1);
+    for (const [id, v] of this.partOverrides) if (t.hasPart(id)) t.setPart(id, v);
   }
 
   destroy(): void {
