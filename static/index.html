@@ -16,7 +16,8 @@
 </svg>
 <div id="viewport">
 <div id="stage">
-  <div id="bg"><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div><div class="grid"></div></div>
+<div id="cam">
+  <div id="bg"><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div><div class="grid"></div><div class="pulse"></div></div>
 
   <!-- 顶栏 -->
   <header id="top">
@@ -41,7 +42,8 @@
     </div>
     <div class="right-info">
       <div id="phase">等待开局</div>
-      <button id="sound" title="音效开关">音效 开</button>
+      <button id="bgm" class="tbtn" title="背景音乐开关">音乐 开</button>
+      <button id="sound" class="tbtn" title="音效开关">音效 开</button>
     </div>
   </header>
 
@@ -79,10 +81,14 @@
     </div>
   </aside>
 
-  <div id="fx"></div>
+  <div id="vig"></div>
   <div id="overlay"></div>
+  <canvas id="fxc" width="1920" height="1080"></canvas>
+  <div id="fx"></div>
 </div>
 </div>
+</div>
+<script src="fx.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
