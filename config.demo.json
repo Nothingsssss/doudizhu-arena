@@ -3,35 +3,102 @@
   "arena": {
     "demo": true,
     "move_delay": 1.2,
-    "game_pause": 6,
+    "game_pause": 8,
     "eliminate_forever": false,
-    "max_games": null
+    "max_games": null,
+    "start_score": 1000,
+    "score_unit": 100
   },
   "players": [
     {
+      "id": "deepseek",
       "name": "DeepSeek",
+      "title": "鲸鱼女仆",
       "color": "#4f8cff",
-      "model": "deepseek-chat"
+      "type": "llm",
+      "base_url": "https://api.deepseek.com/v1",
+      "model": "deepseek-chat",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "voice_id": "",
+      "voice_sim": {
+        "pitch": 1.5,
+        "rate": 1.15,
+        "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
+      }
     },
     {
+      "id": "qwen",
       "name": "通义千问",
+      "title": "古风折扇",
       "color": "#a66bff",
-      "model": "qwen-plus"
+      "type": "llm",
+      "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "model": "qwen-plus",
+      "api_key_env": "DASHSCOPE_API_KEY",
+      "voice_id": "",
+      "voice_sim": {
+        "pitch": 1.1,
+        "rate": 0.9,
+        "voice": "Xiaoxiao|Huihui|Tingting|Female"
+      }
     },
     {
+      "id": "mimo",
       "name": "MiMo",
+      "title": "双马尾少女",
       "color": "#ff8a3d",
-      "model": "mimo"
+      "type": "llm",
+      "base_url": "https://api.xiaomimimo.com/v1",
+      "model": "mimo-v2.6-flash",
+      "api_key_env": "MIMO_API_KEY",
+      "voice_id": "",
+      "voice_sim": {
+        "pitch": 1.7,
+        "rate": 1.2,
+        "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
+      }
     },
     {
+      "id": "doubao",
       "name": "豆包",
+      "title": "圆滚滚",
       "color": "#ffc83d",
-      "model": "doubao"
+      "type": "llm",
+      "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+      "model": "doubao-seed-1-6-250615",
+      "api_key_env": "ARK_API_KEY",
+      "voice_id": "",
+      "voice_sim": {
+        "pitch": 1.35,
+        "rate": 1.0,
+        "voice": "Xiaoxiao|Huihui|Tingting|Female"
+      }
     },
     {
+      "id": "claude",
       "name": "Claude",
+      "title": "像素机器人",
       "color": "#ff6a2b",
-      "model": "claude"
+      "type": "llm",
+      "base_url": "https://api.anthropic.com/v1",
+      "model": "claude-sonnet-4-5",
+      "api_key_env": "ANTHROPIC_API_KEY",
+      "extra_body": {
+        "max_tokens": 512
+      },
+      "voice_id": "",
+      "voice_sim": {
+        "pitch": 0.7,
+        "rate": 0.95,
+        "voice": "Yunxi|Yunyang|Kangkang|Male"
+      }
     }
-  ]
+  ],
+  "tts": {
+    "provider": "heygen",
+    "model": "heygen-voice-1-turbo-free",
+    "api_key_env": "HEYGEN_API_KEY",
+    "timeout": 30,
+    "fallback": "browser"
+  }
 }

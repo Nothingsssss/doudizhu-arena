@@ -9,7 +9,7 @@ import random
 from collections import Counter
 
 from .cards import TYPE_NAMES, classify, legal_moves, new_deck
-from .players import BotPlayer
+from .players import SIM_KEEP, BotPlayer
 
 ALL_TYPES = list(TYPE_NAMES)            # 14 种
 # 发牌时先放占牌多的；出牌时也按这个顺序优先（炸弹、王炸放最后，免得拆掉四带二）
@@ -259,8 +259,7 @@ class DemoPlayer(BotPlayer):
 
 def demo_players(player_cfgs, showcase):
     """沿用配置里的名字、颜色、头像、音色，出牌换成演示机器人。"""
-    keep = ("name", "avatar", "color", "voice_id", "model")
-    return [DemoPlayer(showcase=showcase, **{k: p[k] for k in keep if k in p}) for p in player_cfgs]
+    return [DemoPlayer(showcase=showcase, **{k: p[k] for k in SIM_KEEP if k in p}) for p in player_cfgs]
 
 
 def wrap_emit(emit, showcase):

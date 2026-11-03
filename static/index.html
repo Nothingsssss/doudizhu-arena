@@ -3,54 +3,58 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AI 斗地主擂台赛</title>
+<title>AI 斗地主擂台</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute">
+  <defs>
+    <linearGradient id="gGold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6c8"/><stop offset=".45" stop-color="#ffd25a"/><stop offset=".7" stop-color="#e09a1e"/><stop offset="1" stop-color="#8a4a08"/></linearGradient>
+    <linearGradient id="gGoldH" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8a4a08"/><stop offset=".3" stop-color="#ffd25a"/><stop offset=".5" stop-color="#fff6c8"/><stop offset=".7" stop-color="#ffd25a"/><stop offset="1" stop-color="#8a4a08"/></linearGradient>
+  </defs>
   <symbol id="su0" viewBox="0 0 100 100"><path d="M50 5C35 25 8 40 8 60c0 14 11 22 22 22 8 0 14-4 17-9-1 9-5 17-12 22h30c-7-5-11-13-12-22 3 5 9 9 17 9 11 0 22-8 22-22C92 40 65 25 50 5Z"/></symbol>
   <symbol id="su1" viewBox="0 0 100 100"><path d="M50 90C20 66 5 51 5 31 5 16 17 6 30 6c10 0 17 6 20 13 3-7 10-13 20-13 13 0 25 10 25 25 0 20-15 35-45 59Z"/></symbol>
   <symbol id="su2" viewBox="0 0 100 100"><circle cx="50" cy="27" r="20"/><circle cx="27" cy="58" r="20"/><circle cx="73" cy="58" r="20"/><path d="M45 50h10c0 22 4 33 13 45H32c9-12 13-23 13-45Z"/></symbol>
   <symbol id="su3" viewBox="0 0 100 100"><path d="M50 3 90 50 50 97 10 50Z"/></symbol>
   <symbol id="star" viewBox="0 0 100 100"><path d="M50 4 62 37h35L69 58l11 34-30-21-30 21 11-34L3 37h35Z"/></symbol>
+  <!-- 小丑（大小王） -->
+  <symbol id="jester" viewBox="0 0 100 120">
+    <path d="M50 46 C40 30 22 14 6 18 C20 26 26 38 30 52 Z" fill="#e8283c"/>
+    <path d="M50 46 C46 26 50 8 50 2 C54 8 58 26 54 46 Z" fill="#ffc21a"/>
+    <path d="M50 46 C60 30 78 14 94 18 C80 26 74 38 70 52 Z" fill="#1fae5b"/>
+    <circle cx="6" cy="18" r="5" fill="#ffd23f" stroke="#a86a00" stroke-width="1.5"/>
+    <circle cx="50" cy="3" r="5" fill="#ffd23f" stroke="#a86a00" stroke-width="1.5"/>
+    <circle cx="94" cy="18" r="5" fill="#ffd23f" stroke="#a86a00" stroke-width="1.5"/>
+    <path d="M26 50 Q50 40 74 50 L72 56 Q50 48 28 56 Z" fill="#7a2bd6"/>
+    <ellipse cx="50" cy="72" rx="22" ry="22" fill="#ffe2c4" stroke="#7a3a10" stroke-width="2"/>
+    <path d="M38 66 q4 -5 8 0 M54 66 q4 -5 8 0" stroke="#2a1606" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <circle cx="36" cy="77" r="4" fill="#ff7b8f" opacity=".7"/><circle cx="64" cy="77" r="4" fill="#ff7b8f" opacity=".7"/>
+    <path d="M38 80 Q50 94 62 80 Q50 86 38 80 Z" fill="#c4122c" stroke="#5a0410" stroke-width="1.5"/>
+    <circle cx="50" cy="73" r="3.5" fill="#e8283c"/>
+    <path d="M22 96 L30 92 L36 100 L43 93 L50 101 L57 93 L64 100 L70 92 L78 96 L74 108 Q50 118 26 108 Z" fill="#fff" stroke="#9aa3b5" stroke-width="1.5"/>
+  </symbol>
 </svg>
+
 <div id="viewport">
 <div id="stage">
 <div id="cam">
-  <div id="bg"><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div><div class="grid"></div><div class="pulse"></div></div>
-
-  <!-- 顶栏 -->
-  <header id="top">
-    <div class="brand">
-      <div class="logo">
-        <svg viewBox="0 0 40 40"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe08a"/><stop offset="1" stop-color="#ff8a3d"/></linearGradient></defs>
-          <rect x="6" y="4" width="20" height="28" rx="4" fill="url(#lg)" transform="rotate(-12 16 18)"/>
-          <rect x="14" y="8" width="20" height="28" rx="4" fill="#fff" stroke="#ffb347" stroke-width="1.5" transform="rotate(10 24 22)"/>
-          <text x="24" y="27" font-size="13" font-weight="900" fill="#e53950" text-anchor="middle" transform="rotate(10 24 22)">AI</text></svg>
-      </div>
-      <div>
-        <div class="title">AI 斗地主擂台赛</div>
-        <div class="subtitle">每局淘汰一人 · 赢家守擂</div>
-      </div>
-      <div class="live"><span></span>LIVE</div>
-    </div>
-    <div class="center-info">
-      <div class="pill"><label>局数</label><b id="gameNo">-</b></div>
-      <div class="bottom-wrap"><label>底牌</label><div id="bottom" class="cards mini"></div></div>
-      <div class="pill"><label>底分</label><b id="bid">-</b></div>
-      <div class="pill mult"><label>倍数</label><b id="mult">×1</b></div>
-    </div>
-    <div class="right-info">
-      <div id="phase">等待开局</div>
-      <button id="voice" class="tbtn" title="选手语音开关">语音 开</button>
-      <button id="bgm" class="tbtn" title="背景音乐开关">音乐 开</button>
-      <button id="sound" class="tbtn" title="音效开关">音效 开</button>
-    </div>
-  </header>
+  <!-- 背景：夜空、古建筑、看台、灯笼、条幅 -->
+  <div id="bg">
+    <svg id="scene" viewBox="0 0 1920 1080" preserveAspectRatio="none"></svg>
+    <div class="banner b1"><i></i><span>播</span><em></em></div>
+    <div class="banner b2"><i></i><span>擂</span><em></em></div>
+    <div class="drape d1"></div><div class="drape d2"></div>
+    <div id="embers"></div>
+    <div class="pulse"></div>
+  </div>
 
   <!-- 牌桌 -->
   <main id="table">
-    <div class="felt"><div class="felt-inner"></div><div class="watermark">AI 斗地主</div></div>
+    <div class="felt">
+      <div class="rim"></div>
+      <div class="cloth"><svg id="tableArt" viewBox="0 0 1490 700"></svg></div>
+      <div class="marquee"></div>
+    </div>
     <div id="turnHint"></div>
 
     <section class="seat" id="seat0" data-pos="left"></section>
@@ -61,24 +65,48 @@
     <div class="played" id="played1"></div>
     <div class="played" id="played2"></div>
 
+    <div class="clock" id="clock0"><b>0</b></div>
+    <div class="clock" id="clock1"><b>0</b></div>
+    <div class="clock" id="clock2"><b>0</b></div>
+
     <div class="bubble" id="bubble0"></div>
     <div class="bubble" id="bubble1"></div>
     <div class="bubble" id="bubble2"></div>
   </main>
 
-  <!-- 侧栏 -->
+  <!-- 顶部牌匾 -->
+  <header id="plaque">
+    <svg class="wings" viewBox="0 0 900 200"></svg>
+    <div class="board"><div class="board-in"><div class="ptitle">AI斗地主擂台</div></div></div>
+    <div class="prow">
+      <div class="pchip"><span>第</span><b id="gameNo">-</b><span>局</span></div>
+      <div class="pbottom"><label>底牌</label><div id="bottom"></div></div>
+      <div class="pchip mult"><span>倍数</span><b id="mult">×1</b></div>
+    </div>
+  </header>
+
+  <div id="controls">
+    <span id="phase">等待开局</span>
+    <button id="voice" class="tbtn" title="选手语音开关">语音</button>
+    <button id="bgm" class="tbtn" title="背景音乐开关">音乐</button>
+    <button id="sound" class="tbtn" title="音效开关">音效</button>
+  </div>
+
+  <!-- 右侧面板 -->
   <aside id="side">
-    <div class="panel">
-      <h3><span class="ico"></span>排行榜</h3>
+    <div class="panel p-rank">
+      <h3><i class="crown-ico"></i>排行榜<i class="crown-ico"></i></h3>
       <div id="rank"></div>
     </div>
-    <div class="panel">
-      <h3><span class="ico"></span>挑战者队列</h3>
+    <div class="panel p-queue">
+      <h3><i class="chev">»</i>排队上场<i class="chev">«</i></h3>
       <div id="queue"></div>
     </div>
-    <div class="panel grow">
-      <h3><span class="ico"></span>实时战况</h3>
+    <div class="panel p-feed">
+      <h3>实时战况<span class="onair"><i></i>直播中</span></h3>
+      <div id="feedHead"></div>
       <div id="feed"></div>
+      <div id="ticker"><i>⚡</i><span></span></div>
     </div>
   </aside>
 

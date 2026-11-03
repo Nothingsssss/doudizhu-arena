@@ -3,6 +3,7 @@ import random
 import time
 from collections import deque
 
+from .callout import alarm_call, bid_call, play_call
 from .cards import TYPE_NAMES, fmt, new_deck, validate
 
 
@@ -15,18 +16,26 @@ class Game:
         self.tts = tts
         self.dealer = dealer        # 演示模式用：自定义发牌
 
-    def _sleep(self, audio=None):
+    def _sleep(self, clips=None):
         # 有语音时等它念完再继续，避免几个人的话叠在一起
         t = self.move_delay
-        if audio and audio.get("duration"):
-            t = max(t, audio["duration"] + 0.3)
+        talk = sum(c.get("duration") or 0 for c in clips or [])
+        if talk:
+            t = max(t, talk + 0.3)
         if t:
             time.sleep(t)
 
-    def _voice(self, seat, say):
-        if not self.tts or not say:
-            return None
-        return self.tts.speak(say, getattr(self.players[seat], "voice_id", ""))
+    def _voice(self, seat, *texts):
+        """按顺序合成几段话（播报词、报警、发言），返回网页要播放的片段列表。"""
+        if not self.tts:
+            return []
+        p = self.players[seat]
+        clips = []
+        for t in texts:
+            c = self.tts.speak(t, getattr(p, "voice_id", ""), getattr(p, "voice_sim", None)) if t else None
+            if c:
+                clips.append(c)
+        return clips
 
     def _deal(self):
         if self.dealer:
@@ -48,10 +57,11 @@ class Game:
                 b, say = self.players[seat].bid(view)
                 b = b if (b == 0 or best < b <= 3) else 0
                 think_ms = int((time.time() - t0) * 1000)
-                audio = self._voice(seat, say)
-                self.emit("bid", {"seat": seat, "bid": b, "say": say, "audio": audio,
+                call = bid_call(b)
+                clips = self._voice(seat, call, say)
+                self.emit("bid", {"seat": seat, "bid": b, "say": say, "call": call, "clips": clips,
                                   "think_ms": think_ms})
-                self._sleep(audio)
+                self._sleep(clips)
                 if b > best:
                     best, landlord = b, seat
                 if best == 3:
@@ -77,6 +87,7 @@ class Game:
         history, bombs = [], 0
         turn, prev, prev_seat, passes = landlord, None, None, 0
         played = [0, 0, 0]
+        alarmed = [False, False, False]
         while True:
             view = {
                 "seat": turn, "hand": hands[turn], "roles": roles, "names": names,
@@ -108,14 +119,20 @@ class Game:
             else:
                 passes += 1
                 history.append((names[turn], roles[turn], []))
-            audio = self._voice(turn, say)
-            self.emit("play", {"seat": turn, "audio": audio, "cards": list(move.cards) if move else [],
+            call = play_call(move, self.rng)
+            left = len(hands[turn])
+            alarm = alarm_call(left) if move and left in (1, 2) and not alarmed[turn] else ""
+            if alarm:
+                alarmed[turn] = True
+            clips = self._voice(turn, call, alarm, say)
+            self.emit("play", {"seat": turn, "call": call, "alarm": alarm, "clips": clips,
+                               "cards": list(move.cards) if move else [],
                                "type": TYPE_NAMES[move.type] if move else "不要",
                                "kind": move.type if move else "pass",
                                "say": say, "cards_left": [len(h) for h in hands],
                                "hands": [list(h) for h in hands], "think_ms": think_ms,
                                "multiplier": base * (2 ** bombs)})
-            self._sleep(audio)
+            self._sleep(clips)
             if not hands[turn]:
                 winner_side = roles[turn]
                 break
@@ -144,7 +161,8 @@ class Arena:
     """
 
     def __init__(self, players, emit, move_delay=1.0, game_pause=5.0,
-                 eliminate_forever=False, seed=None, tts=None, dealer=None):
+                 eliminate_forever=False, seed=None, tts=None, dealer=None,
+                 start_score=1000, score_unit=100):
         if len(players) < 3:
             raise ValueError("至少需要 3 名玩家")
         self.rng = random.Random(seed)
@@ -158,12 +176,12 @@ class Arena:
         self.game_pause = game_pause
         self.eliminate_forever = eliminate_forever
         self.game_no = 0
-        self.stats = {p.name: {"games": 0, "wins": 0, "losses": 0, "score": 0,
+        self.score_unit = score_unit    # 每 1 倍对应多少积分
+        self.stats = {p.name: {"games": 0, "wins": 0, "losses": 0, "score": start_score,
                                "streak": 0, "best_streak": 0, "eliminated": 0}
                       for p in players}
         self.running = True
-        self.profiles = {p.name: {"avatar": p.avatar, "color": p.color, "model": p.model}
-                         for p in players}
+        self.profiles = {p.name: p.profile() for p in players}
 
     def snapshot(self):
         return {"game_no": self.game_no, "profiles": self.profiles,
@@ -192,11 +210,13 @@ class Arena:
         res = Game(self.table, self.emit, self.move_delay, self.rng, self.tts, self.dealer).run()
 
         win_side = res["winner_side"]
+        deltas = []
         for i, p in enumerate(self.table):
             s = self.stats[p.name]
             s["games"] += 1
             won = res["roles"][i] == win_side
-            pts = res["multiplier"] * (2 if res["roles"][i] == "地主" else 1)
+            pts = res["multiplier"] * (2 if res["roles"][i] == "地主" else 1) * self.score_unit
+            deltas.append(pts if won else -pts)
             if won:
                 s["wins"] += 1
                 s["score"] += pts
@@ -216,7 +236,7 @@ class Arena:
             self.table[loser_seat] = newcomer
             (self.out if self.eliminate_forever else self.queue).append(loser)
         self.emit("game_end", {
-            **res, "loser": loser.name, "reason": reason,
+            **res, "loser": loser.name, "reason": reason, "deltas": deltas,
             "newcomer": newcomer.name if newcomer else None,
             **self.snapshot(),
         })

@@ -4,7 +4,9 @@
     "move_delay": 1.5,
     "game_pause": 8,
     "eliminate_forever": false,
-    "max_games": null
+    "max_games": null,
+    "start_score": 1000,
+    "score_unit": 100
   },
   "players": [
     {
@@ -62,6 +64,25 @@
     "provider": "heygen",
     "model": "heygen-voice-1-turbo-free",
     "api_key_env": "HEYGEN_API_KEY",
-    "timeout": 30
+    "timeout": 30,
+    "fallback": "browser"
+  },
+  "tts_custom_example": {
+    "_说明": "想换成别的语音接口时，把这段改名为 tts 并按接口文档填写。下面是 OpenAI /audio/speech 的写法（返回的就是音频）",
+    "provider": "custom",
+    "url": "https://api.openai.com/v1/audio/speech",
+    "headers": {
+      "Authorization": "Bearer ${OPENAI_API_KEY}"
+    },
+    "required_env": [
+      "OPENAI_API_KEY"
+    ],
+    "body": {
+      "model": "gpt-4o-mini-tts",
+      "voice": "{voice_id}",
+      "input": "{text}",
+      "response_format": "mp3"
+    },
+    "fallback": "browser"
   }
 }

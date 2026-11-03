@@ -144,11 +144,12 @@ function rain(o = {}) {
       w: R([8, 14]), h: R([12, 20]), rot: rnd(0, 6), spin: rnd(-8, 8), c: pick(cs), life: R([3, 5]) });
   }
 }
-function firework(x, y, colors) {
-  glow(x, y, { size: 280, c: "rgba(255,240,210,.9)", life: 0.35 });
-  burst(x, y, { n: 150, colors, speed: [200, 800], g: 280, drag: 0.94, len: [0.03, 0.06], w: [2, 3.5], life: [0.9, 1.7] });
-  glitter(x, y, { n: 70, colors: colors.concat("#fff"), speed: [80, 600], g: 120, life: [1.2, 2.2] });
-  ring(x, y, { c: colors[0], vr: 1000, w: 6, life: 0.5 });
+// k：大小，1 为正常烟花，背景里的小烟花用 0.3 左右
+function firework(x, y, colors, k = 1) {
+  glow(x, y, { size: 280 * k, c: "rgba(255,240,210,.9)", life: 0.35 });
+  burst(x, y, { n: 150 * k, colors, speed: [200 * k, 800 * Math.sqrt(k)], g: 280, drag: 0.94, len: [0.03, 0.06], w: [2, 3.5], life: [0.9, 1.7] });
+  glitter(x, y, { n: 70 * k, colors: colors.concat("#fff"), speed: [80, 600 * Math.sqrt(k)], g: 120, life: [1.2, 2.2] });
+  if (k >= 0.6) ring(x, y, { c: colors[0], vr: 1000, w: 6, life: 0.5 });
 }
 // 拖尾飞行物（火箭、流星），到达终点时调用 boom
 function shell(x0, y0, x1, y1, dur, colors, boom, o = {}) {

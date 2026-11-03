@@ -63,6 +63,25 @@ class Bus:
                 self.clients.remove(q)
 
 
+AVATAR_EXT = (".png", ".webp", ".jpg", ".jpeg", ".gif")
+
+
+def resolve_avatar(p):
+    """头像：配置里写了网址就直接用；写了本地路径或没写，就到 static/avatars/ 找 <id>.png/.webp/.jpg。
+    找不到返回空字符串，网页显示自动生成的徽章，不会出现裂图。"""
+    av = (p.avatar or "").strip()
+    if av.startswith(("http://", "https://", "data:")):
+        return av
+    cands = [av] if av else []
+    cands += [f"avatars/{p.id}{e}" for e in AVATAR_EXT]
+    for c in cands:
+        f = (STATIC / c.lstrip("/")).resolve()
+        if STATIC.resolve() in f.parents and f.is_file():
+            return c.lstrip("/")
+    print(f"[avatar] {p.name}：没找到头像，放一张图到 static/avatars/{p.id}.png 即可", flush=True)
+    return ""
+
+
 def _default(o):
     if hasattr(o, "_asdict"):
         return o._asdict()
@@ -104,7 +123,8 @@ def make_handler(bus):
                 return
             text = {".html": "text/html", ".js": "application/javascript", ".css": "text/css"}
             binary = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".ogg": "audio/ogg", ".aac": "audio/aac",
-                      ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
+                      ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp",
+                      ".gif": "image/gif", ".svg": "image/svg+xml"}
             if f.suffix in text:
                 ctype = text[f.suffix] + "; charset=utf-8"
             else:
@@ -139,13 +159,17 @@ def main():
         print("演示模式：不调用大模型接口，所有牌型都会依次打出", flush=True)
     else:
         players = [make_player(p) for p in cfg["players"]]
+    for p in players:
+        p.avatar = resolve_avatar(p)
     arena = Arena(players, emit,
                   move_delay=a.get("move_delay", 1.5),
                   game_pause=a.get("game_pause", 8),
                   eliminate_forever=a.get("eliminate_forever", False),
                   seed=a.get("seed"),
                   tts=make_tts(cfg.get("tts"), STATIC / "audio"),
-                  dealer=dealer)
+                  dealer=dealer,
+                  start_score=a.get("start_score", 1000),
+                  score_unit=a.get("score_unit", 100))
     threading.Thread(target=arena.run_forever, kwargs={"max_games": a.get("max_games")},
                      daemon=True).start()
 
