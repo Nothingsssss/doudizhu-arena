@@ -155,9 +155,14 @@ async function sheetFace(src) {
 const EXPR = { calm: 0, happy: 1, think: 2, shock: 3, angry: 4, sad: 5, laugh: 6, smug: 7, shy: 8, hype: 9 };
 const exprTimers = [0, 0, 0];
 function setExpr(i, mood, ms = 2600) {
-  const el = $("seat" + i) && $("seat" + i).querySelector(".expr");
-  if (!el) return;
   const k = typeof mood === "number" ? mood : EXPR[mood] ?? 0;
+  l2dMood(i, k);
+  const el = $("seat" + i) && $("seat" + i).querySelector(".expr");
+  if (!el) {
+    clearTimeout(exprTimers[i]);
+    if (ms > 0 && k !== 0) exprTimers[i] = setTimeout(() => setExpr(i, 0, 0), ms);
+    return;
+  }
   const p = prof(G.seats[i].name);
   const face = el.querySelector("i");
   if (!face.style.backgroundImage) face.style.backgroundImage = `url("${p.faces}")`;
@@ -169,15 +174,77 @@ function setExpr(i, mood, ms = 2600) {
 const others = (i) => [0, 1, 2].filter((j) => j !== i);
 function exprPlay(d) {
   const i = d.seat, k = d.kind || "";
-  if (!d.cards.length) return setExpr(i, "sad");
+  if (!d.cards.length) { l2dAct(i, "shake"); return setExpr(i, "sad"); }
   if (k === "rocket" || k === "bomb") {
     setExpr(i, "smug", 3200);
+    l2dAct(i, "tilt");
     others(i).forEach((j) => setExpr(j, G.roles[j] && G.roles[j] === G.roles[i] ? "laugh" : "shock", 3200));
     return;
   }
   if (k.startsWith("plane") || k === "straight" || k === "pair_straight" || k.startsWith("four")) return setExpr(i, "hype");
   setExpr(i, Math.random() < 0.5 ? "happy" : "shy", 2000);
 }
+
+/* ================= Live2D（可选） =================
+ * 角色配置里写了 live2d.model（model3.json）时，牌桌上的立绘换成 Live2D 模型（官方 Cubism SDK，见 live2d/README.md）。
+ * live2d.js、Cubism Core、WebGL、模型文件任何一个不可用，都继续显示原来的立绘图片。?l2d=0 关闭。 */
+const L2D = { on: Q.get("l2d") !== "0", api: null, loading: null, seatIds: ["", "", ""] };
+// 表情图的 10 种表情 → Live2D 的 8 种情绪
+const MOOD_EMOTION = ["neutral", "happy", "thinking", "surprised", "angry", "sad", "happy", "confident", "shy", "happy"];
+function l2dApi() {
+  if (!L2D.on) return Promise.resolve(null);
+  if (L2D.loading) return L2D.loading;
+  L2D.loading = new Promise((res) => {
+    if (window.Live2D) return res(window.Live2D);
+    const s = document.createElement("script");
+    s.src = "live2d/live2d.js";
+    s.onload = () => res(window.Live2D || null);
+    s.onerror = () => res(null);
+    document.head.appendChild(s);
+  }).then((api) => {
+    if (!api) { console.warn("[Live2D] live2d/live2d.js 加载失败，使用立绘图片"); return null; }
+    if (!api.webglSupport().webgl) { console.warn("[Live2D] 浏览器不支持 WebGL，使用立绘图片"); return null; }
+    api.setAudioContextProvider(() => FX.ctx());   // 和音效共用一个 AudioContext
+    return api.loadCore().then(() => { api.registry.maxActive = 4; return (L2D.api = api); },
+      (e) => { console.warn("[Live2D]", e.message); return null; });
+  });
+  return L2D.loading;
+}
+const l2dKey = (name) => prof(name).id || name;
+function l2dCtrl(i) {
+  if (!L2D.api || !L2D.seatIds[i]) return null;
+  const c = L2D.api.registry.get(L2D.seatIds[i]);
+  return c && c.ready ? c : null;
+}
+function l2dCtrlByName(name) { const i = G.seats.findIndex((s) => s.name === name); return i >= 0 ? l2dCtrl(i) : null; }
+function mountL2D(i) {
+  const s = G.seats[i], cfg = prof(s.name).live2d;
+  L2D.seatIds[i] = "";
+  if (!s.name || !cfg || !cfg.model || !L2D.on) return;
+  const portrait = $("seat" + i).querySelector(".portrait");
+  const holder = document.createElement("div");
+  holder.className = "l2d";
+  portrait.appendChild(holder);
+  const key = l2dKey(s.name);
+  l2dApi().then((api) => {
+    if (!api || !holder.isConnected) return null;
+    if (!api.registry.has(key)) api.registry.register({ id: key, name: s.name, ...cfg });
+    return api.registry.mount(key, holder);
+  }).then((ctrl) => {
+    if (!ctrl || !holder.isConnected) return;
+    L2D.seatIds[i] = key;
+    portrait.classList.add("l2d-on");
+    const ex = $("seat" + i).querySelector(".expr");
+    ctrl.setEmotion(MOOD_EMOTION[+(ex && ex.dataset.k) || 0] || "neutral");
+  }).catch((e) => {
+    console.warn(`[Live2D] ${s.name} 模型加载失败，继续用立绘：${e.message}`);
+    holder.remove();
+  });
+}
+function l2dRetain() { if (L2D.api) L2D.api.registry.retain(G.seats.map((s) => l2dKey(s.name))); }
+function l2dMood(i, k) { const c = l2dCtrl(i); if (c) c.setEmotion(MOOD_EMOTION[k] || "neutral"); }
+function l2dAct(i, a) { const c = l2dCtrl(i); if (c) c.interact(a).catch(() => {}); }
+function l2dStopAll() { for (let i = 0; i < 3; i++) { const c = l2dCtrl(i); if (c) c.stopSpeaking(); } }
 
 function artOf(name, src) {
   if (!ART.has(src)) ART.set(src, processArt(src, prof(name)).catch(() => null));
@@ -317,6 +384,7 @@ function buildSeat(i) {
       <div class="modelline">${meta}${p.sim ? `<span class="simtag">模拟</span>` : ""}</div>
     </div>
     <div class="hand"></div>`;
+  mountL2D(i);
 }
 function updateSeat(i) {
   const s = G.seats[i], el = $("seat" + i);
@@ -687,6 +755,7 @@ function stopVoice() {
   VOICE.q = []; const c = VOICE.cur; VOICE.cur = null; clearTimeout(VOICE.tm);
   if (c && c.pause) c.pause();
   if (TTS_OK) speechSynthesis.cancel();
+  l2dStopAll();
 }
 function speakClips(name, clips) {
   if (!G.live || !VOICE.on || !clips || !clips.length) return;
@@ -700,18 +769,23 @@ function nextClip() {
   if (!c) { VOICE.cur = null; FX.duck(false); return; }
   FX.duck(true);
   const done = (me) => () => { if (VOICE.cur === me) nextClip(); };
+  const lc = l2dCtrlByName(c.name);   // 这个角色是 Live2D 的话，跟着语音动嘴
   if (c.url) {
     const a = new Audio(c.url); VOICE.cur = a;
-    a.onended = a.onerror = done(a);
-    const p = a.play(); if (p && p.catch) p.catch(done(a));
+    const fin = done(a), end = () => { if (lc) lc.stopSpeaking(); fin(); };
+    if (lc) lc.startSpeaking({ audio: a, text: c.text, duration: c.duration });
+    a.onended = a.onerror = end;
+    const p = a.play(); if (p && p.catch) p.catch(end);
   } else if (c.sim && TTS_OK) {
     const sim = prof(c.name).voice_sim || {};
     const u = new SpeechSynthesisUtterance(c.text);
     u.lang = "zh-CN"; const v = pickVoice(sim); if (v) u.voice = v;
     u.pitch = clamp(+sim.pitch || 1, 0, 2); u.rate = clamp(+sim.rate || 1, 0.5, 2); u.volume = 1;
-    VOICE.cur = u; u.onend = u.onerror = done(u);
+    const fin = done(u), end = () => { if (lc) lc.stopSpeaking(); fin(); };
+    VOICE.cur = u; u.onend = u.onerror = end;
+    if (lc) lc.startSpeaking({ text: c.text, duration: c.duration || c.text.length * 0.25 });   // 语音合成拿不到音频数据，按文字估算口型
     speechSynthesis.speak(u);
-    VOICE.tm = setTimeout(done(u), ((c.duration || 2) + 1.5) * 1000);   // 有的浏览器不触发 onend
+    VOICE.tm = setTimeout(end, ((c.duration || 2) + 1.5) * 1000);   // 有的浏览器不触发 onend
   } else nextClip();
 }
 
@@ -826,6 +900,7 @@ const H = {
     G.bid = 0; G.mult = 1; G.landlord = -1; G.turn = -1; G.roles = [null, null, null];
     d.table.forEach((n, i) => Object.assign(G.seats[i], { name: n, hand: [], played: null, thinking: false, alarmed: false }));
     for (let i = 0; i < 3; i++) { buildSeat(i); renderPlayed(i); showClock(i, false); setExpr(i, 0, 0); }
+    l2dRetain();
     hideBubbles(); stopVoice(); setPhase("叫地主"); setHint("");
     $("bottom").innerHTML = cardsHtml([{ back: 1 }, { back: 1 }, { back: 1 }], 3, "sz-xs");
     renderBoard(d, false); renderAllSeats();
@@ -879,6 +954,7 @@ const H = {
     ticker(`${s.name} 抢到地主！${farmersOf(d.seat).join("、")} 联手能否掀翻？`, true);
     fxLandlord(d.seat, s.name);
     setExpr(d.seat, "laugh", 3000); others(d.seat).forEach((j) => setExpr(j, "angry", 2400));
+    l2dAct(d.seat, "nod");
   },
 
   play(d) {
@@ -926,6 +1002,7 @@ const H = {
     for (let i = 0; i < 3; i++) showClock(i, false);
     dropThinking();
     d.roles.forEach((r, i) => setExpr(i, G.seats[i].name === d.loser ? "sad" : r === d.winner_side ? "laugh" : "angry", 0));
+    d.roles.forEach((r, i) => { if (G.seats[i].name === d.loser) l2dAct(i, "lowerHead"); });
     d.hands_left.forEach((h, i) => { resyncHand(i, h); renderHand(i, false); });
     G.snap = d; G.profiles = d.profiles || G.profiles;
     renderAllSeats(); renderBoard(d, true); setPhase("结算"); setHint("");

@@ -65,6 +65,23 @@ python server.py --config config.demo.json  # 演示模式：保证 14 种牌型
 `config.json` 里每个选手有 `code`（形象编号 C01~C20）、`id`、`name`（显示名）、`title`（形象名）、`color`（主题色）。
 全身立绘放到 `static/avatars/<id>.png`，白底会自动去掉，详见 [static/avatars/README.md](static/avatars/README.md)。没放图的显示自动生成的徽章。
 
+## Live2D 虚拟人（可选）
+
+接了官方 Live2D Cubism SDK for Web（5-r.5）。给选手配好 Cubism Editor 导出的模型后，牌桌上的立绘换成会动的 Live2D：
+待机呼吸、眨眼、头和身体摆动、头发衣服物理、跟着语音动嘴、按牌局切换情绪（开心 / 生气 / 难过 / 惊讶 / 思考 / 害羞 / 自信），
+叫到地主点头、要不起摇头、出炸弹侧身、被淘汰低头。
+
+需要两样东西，仓库里都没有：
+1. 官方 Cubism Core：从 Live2D 官网下载并同意授权协议，放到 `static/live2d/core/`，见 [static/live2d/core/README.md](static/live2d/core/README.md)
+2. 每个角色的 Live2D 模型（`.moc3` 等）：用 Cubism Editor 制作，放到 `static/live2d/models/<id>/`，然后在 `config.json` 里加 `live2d` 字段，见 [static/live2d/models/README.md](static/live2d/models/README.md)
+
+缺任何一样，或者浏览器不支持 WebGL，都会继续显示原来的立绘。`?l2d=0` 可以强制关闭。
+
+- 调试页：`http://localhost:8000/live2d.html`（选模型、调位置缩放、拖动控制头部、眼睛嘴巴、表情、动作、测试音频口型、物理开关、参数表、性能、错误日志）
+- 验证运行环境：`sh tools/fetch_live2d_samples.sh` 下载官方示例模型 Hiyori / Mao，在调试页加载
+- 给美术准备建模素材：`python3 tools/live2d_prep.py`，输出到 `live2d/prep/<id>/`（清理后的立绘、表情切图、分层 PSD 模板）
+- 开发说明见 [live2d/README.md](live2d/README.md)
+
 ## 接入真实接口
 
 ### 大模型
@@ -193,4 +210,6 @@ python server.py --config config.demo.json     # 或者对任意配置加 --demo
 - `arena/voice.py`：语音（本地模拟 / HeyGen / 自定义接口）
 - `arena/demo.py`：演示模式
 - `server.py`：网页服务 + 实时推送（SSE）
+- `live2d/`：Live2D 模块源码（TypeScript）和官方 CubismWebFramework（submodule），`node live2d/build.mjs` 生成 `static/live2d/live2d.js`
+- `tools/live2d_prep.py`、`tools/fetch_live2d_samples.sh`：建模素材准备、下载官方示例模型
 - `static/`：直播画面（`index.html`、`style.css`、`app.js`、粒子引擎 `fx.js`、牌型动画 `combo.js`），`static/avatars/` 放立绘

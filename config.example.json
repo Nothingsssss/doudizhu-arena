@@ -16,7 +16,8 @@
       "model": "deepseek-chat",
       "api_key_env": "DEEPSEEK_API_KEY",
       "color": "#4f8cff",
-      "voice_id": ""
+      "voice_id": "",
+      "live2d": { "model": "live2d/models/deepseek/deepseek.model3.json", "scale": 1.6, "y": -0.5 }
     },
     {
       "name": "通义千问",

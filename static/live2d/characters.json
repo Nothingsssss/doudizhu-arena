@@ -1,0 +1,38 @@
+{
+  "_说明": "Live2D 角色表。model 是 model3.json 路径（相对网站根目录）。sample=true 的是 Live2D 官方示例模型，用 tools/fetch_live2d_samples.sh 下载，只用于验证运行环境。",
+  "characters": [
+    {
+      "id": "hiyori",
+      "name": "Hiyori（官方示例）",
+      "sample": true,
+      "model": "live2d/models/_samples/Hiyori/Hiyori.model3.json",
+      "scale": 1.0,
+      "x": 0,
+      "y": 0,
+      "motions": { "idle": "Idle" },
+      "wave": { "param": "ParamArmRA", "from": 0, "to": 10 },
+      "params": ["ParamAngleX", "ParamAngleY", "ParamAngleZ", "ParamEyeLOpen", "ParamEyeROpen", "ParamMouthOpenY", "ParamBodyAngleX"]
+    },
+    {
+      "id": "mao",
+      "name": "Mao（官方示例）",
+      "sample": true,
+      "model": "live2d/models/_samples/Mao/Mao.model3.json",
+      "scale": 1.0,
+      "x": 0,
+      "y": 0,
+      "expressions": {
+        "neutral": "exp_01",
+        "happy": "exp_02",
+        "thinking": "exp_03",
+        "confident": "exp_04",
+        "sad": "exp_05",
+        "shy": "exp_06",
+        "surprised": "exp_07",
+        "angry": "exp_08"
+      },
+      "motions": { "idle": "Idle" },
+      "params": ["ParamAngleX", "ParamAngleY", "ParamAngleZ", "ParamEyeLOpen", "ParamEyeROpen", "ParamA", "ParamBodyAngleX"]
+    }
+  ]
+}

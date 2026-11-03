@@ -87,6 +87,13 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; colo
 .portrait .art.full img:not([src]) { visibility: hidden; }
 .seat[data-pos="bottom"] .portrait .art.full img { height: 185%; }
 .seat.out .portrait .art { filter: grayscale(1) brightness(.5); }
+/* Live2D：模型加载完成前一直显示立绘，加载好后交叉淡入，不跳动 */
+.portrait .l2d { position: absolute; inset: 0; z-index: 1; opacity: 0; transition: opacity .5s; pointer-events: none;
+  -webkit-mask-image: linear-gradient(#000 80%, transparent 100%); mask-image: linear-gradient(#000 80%, transparent 100%); }
+.portrait .art { transition: transform .4s, filter .4s, opacity .5s; }
+.portrait.l2d-on .l2d { opacity: 1; }
+.portrait.l2d-on .art { opacity: 0; }
+.seat.out .portrait .l2d { filter: grayscale(1) brightness(.5); }
 /* 没头像时的徽章 */
 .emblem { position: relative; width: 62%; aspect-ratio: 1; margin-bottom: 14%; display: flex; align-items: center; justify-content: center; }
 .emblem::before { content: ""; position: absolute; inset: -6%; border-radius: 50%; background: conic-gradient(from 0deg, transparent, var(--pc), transparent 30%, var(--pc) 50%, transparent 70%, var(--pc), transparent);

@@ -85,6 +85,22 @@ def resolve_avatar(p, field="avatar", suffix=""):
     return ""
 
 
+def resolve_live2d(p):
+    """Live2D 模型：检查 model3.json 是否在 static/ 里真实存在，不存在就不启用（网页继续显示立绘）。"""
+    cfg = getattr(p, "live2d", None)
+    if not cfg:
+        return None
+    model = str(cfg.get("model") or "").strip().lstrip("/")
+    if not model.endswith(".model3.json"):
+        print(f"[live2d] {p.name}：model 必须是 .model3.json 路径，已忽略", flush=True)
+        return None
+    f = (STATIC / model).resolve()
+    if STATIC.resolve() not in f.parents or not f.is_file():
+        print(f"[live2d] {p.name}：找不到 static/{model}，继续使用立绘图片", flush=True)
+        return None
+    return {**cfg, "model": model}
+
+
 def _default(o):
     if hasattr(o, "_asdict"):
         return o._asdict()
@@ -124,7 +140,8 @@ def make_handler(bus):
             if STATIC.resolve() not in f.parents or not f.is_file():
                 self.send_error(404)
                 return
-            text = {".html": "text/html", ".js": "application/javascript", ".css": "text/css"}
+            text = {".html": "text/html", ".js": "application/javascript", ".css": "text/css", ".json": "application/json",
+                    ".frag": "text/plain", ".vert": "text/plain", ".md": "text/plain"}
             binary = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".ogg": "audio/ogg", ".aac": "audio/aac",
                       ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp",
                       ".gif": "image/gif", ".svg": "image/svg+xml"}
@@ -165,6 +182,7 @@ def main():
     for p in players:
         p.avatar = resolve_avatar(p)
         p.faces = resolve_avatar(p, "faces", "-faces")
+        p.live2d = resolve_live2d(p)
     arena = Arena(players, emit,
                   move_delay=a.get("move_delay", 1.5),
                   game_pause=a.get("game_pause", 8),
