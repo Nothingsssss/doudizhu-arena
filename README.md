@@ -91,33 +91,33 @@ python server.py --config config.demo.json  # 演示模式：保证 14 种牌型
 
 ### 大模型
 
-`config.json` 已经按形象对应图放好 22 个角色（前 3 个先上桌，其余排队），并预留了接口：
+`config.json` 已经按形象对应图放好 23 个角色（前 3 个先上桌，其余排队），并预留了接口：
 
 | 选手 | 接口地址 | 模型 | 密钥环境变量 |
 |---|---|---|---|
 | C01 Claude | `https://api.anthropic.com/v1` | `claude-sonnet-4-5` | `ANTHROPIC_API_KEY` |
-| C02 DeepSeek | `https://api.deepseek.com/v1` | `deepseek-flash` | `DEEPSEEK_API_KEY` |
-| C03 Kimi | `https://api.moonshot.cn/v1` | `kimi-latest` | `MOONSHOT_API_KEY` |
-| C04 通义千问 | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-plus` | `DASHSCOPE_API_KEY` |
-| C05 GLM | `https://open.bigmodel.cn/api/paas/v4` | `glm-4-flash` | `ZHIPU_API_KEY` |
+| C02 DeepSeek | `https://api.deepseek.com/v1` | `deepseek-v4.1-flash-1017` | `DEEPSEEK_API_KEY` |
+| C03 Kimi | `https://api.moonshot.cn/v1` | `kimi-k3` | `MOONSHOT_API_KEY` |
+| C04 通义千问 | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen3.8-flash` | `DASHSCOPE_API_KEY` |
+| C05 GLM | `https://open.bigmodel.cn/api/paas/v4` | `glm-5.3-flash` | `ZHIPU_API_KEY` |
 | C06 Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-2.5-flash` | `GEMINI_API_KEY` |
 | C07 Perplexity | `https://api.perplexity.ai` | `sonar` | `PERPLEXITY_API_KEY` |
 | C08 Mistral | `https://api.mistral.ai/v1` | `mistral-small-latest` | `MISTRAL_API_KEY` |
 | C09 Grok | `https://api.x.ai/v1` | `grok-3-mini` | `XAI_API_KEY` |
 | C10 Meta | `https://api.llama.com/compat/v1` | `Llama-4-Maverick-17B-128E-Instruct-FP8` | `LLAMA_API_KEY` |
-| C11 豆包 | `https://ark.cn-beijing.volces.com/api/v3` | `doubao-seed-1-6-250615` | `ARK_API_KEY` |
+| C11 豆包 | `https://ark.cn-beijing.volces.com/api/v3` | `doubao-seed-2-0-lite-260428` | `ARK_API_KEY` |
 | C12 文心一言 | `https://qianfan.baidubce.com/v2` | `ernie-4.5-turbo-32k` | `QIANFAN_API_KEY` |
 | C13 GitHub | `https://models.github.ai/inference` | `openai/gpt-4.1-mini` | `GITHUB_TOKEN` |
 | C14 GitLab | （待填） | （待填） | `GITLAB_LLM_API_KEY` |
 | C15 Gitee | `https://ai.gitee.com/v1` | `Qwen2.5-72B-Instruct` | `GITEE_AI_API_KEY` |
-| C16 腾讯混元 | `https://api.hunyuan.cloud.tencent.com/v1` | `hunyuan-turbos-latest` | `HUNYUAN_API_KEY` |
+| C16 腾讯混元 | `https://api.hunyuan.cloud.tencent.com/v1` | `hy4-preview` | `HUNYUAN_API_KEY` |
 | C17 RWKV | （待填） | （待填） | `RWKV_API_KEY` |
 | C18 海螺 | `https://api.minimaxi.com/v1` | `MiniMax-M2` | `MINIMAX_API_KEY` |
 | C19 OpenCode | （待填） | （待填） | `OPENCODE_API_KEY` |
 | C20 GPT | `https://api.openai.com/v1` | `gpt-4o-mini` | `OPENAI_API_KEY` |
 | C21 小米 MiMo | `https://api.xiaomimimo.com/v1` | `mimo-v2.6-flash` | `MIMO_API_KEY` |
-| C22 阶跃星辰 | `https://api.stepfun.com/v1` | `step-3.7-flash` | `STEPFUN_API_KEY` |
-| C23 DeepSeek V4 Pro | `https://api.deepseek.com/v1` | `deepseek-v4-pro` | `DEEPSEEK_API_KEY` |
+| C22 阶跃星辰 | `https://api.stepfun.com/v1` | `step-5-preview` | `STEPFUN_API_KEY` |
+| C23 DeepSeek V4 Pro | `https://api.deepseek.com/v1` | `deepseek-v4-pro-0813` | `DEEPSEEK_API_KEY` |
 
 GitLab、RWKV、OpenCode 没有统一的公开接口，`base_url`、`model` 留空，填上你自己的网关或本地部署地址就能接入（留空时一直本地模拟）。
 模型名按你实际开通的改。**设了哪个密钥，哪个选手就接真实模型；没设的继续本地模拟**（名牌上显示「模拟」），所以可以一个一个接：
@@ -143,6 +143,22 @@ python server.py
 | `none` | 静音 |
 
 默认配置是 `heygen` + `"fallback": "browser"`：没设密钥、选手没填 `voice_id`、或者某句合成失败时，自动用本地模拟顶上，不会没声音。合成结果缓存在 `static/audio/`，同一句话只请求一次。
+
+默认配置和演示配置已为以下九位选手设置各自的 HeyGen 公共音色（`voice_id` 用于调用，`voice_name` 便于核对）。密钥仍从 `HEYGEN_API_KEY` 环境变量读取。音色均已通过中文合成验证；音频会按模型、音色和文本分别缓存。
+
+| 选手 / 模型 | HeyGen 音色 |
+|---|---|
+| 智谱 `glm-5.3-flash` | Shuxian – Clear & Trustworthy |
+| Kimi `kimi-k3` | Ceecee – Soothing |
+| DeepSeek 4.1 `deepseek-v4.1-flash-1017` | Mengyao – Punchy & Upbeat |
+| DeepSeek V4 Pro `deepseek-v4-pro-0813` | Lea outside walking |
+| 豆包 `doubao-seed-2-0-lite-260428` | Melissa – Friendly |
+| 千问 `qwen3.8-flash` | Lea inside sitting down |
+| 小米 `mimo-v2.6-flash` | Lea on balcony |
+| 混元 `hy4-preview` | Ceecee – Serious |
+| 阶跃星辰 `step-5-preview` | Haoran – Bright & Articulate |
+
+音色列表接口的分页使用返回的 `next_token` 作为下一页请求的 `token` 参数。
 
 `custom` 的写法（以 OpenAI 语音接口为例，返回的就是音频）：
 

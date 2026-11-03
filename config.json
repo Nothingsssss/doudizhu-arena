@@ -41,9 +41,9 @@
       "color": "#4f6bff",
       "type": "llm",
       "base_url": "https://api.deepseek.com/v1",
-      "model": "deepseek-flash",
+      "model": "deepseek-v4.1-flash-1017",
       "api_key_env": "DEEPSEEK_API_KEY",
-      "voice_id": "",
+      "voice_id": "976a1fdb2e944e639dd9a140eb18dc25",
       "voice_sim": {
         "pitch": 1.5,
         "rate": 1.15,
@@ -52,7 +52,8 @@
       "cutin_eyes": [
         0.4,
         0.64
-      ]
+      ],
+      "voice_name": "Mengyao - Punchy & Upbeat"
     },
     {
       "code": "C23",
@@ -62,15 +63,16 @@
       "color": "#2f6bff",
       "type": "llm",
       "base_url": "https://api.deepseek.com/v1",
-      "model": "deepseek-v4-pro",
+      "model": "deepseek-v4-pro-0813",
       "api_key_env": "DEEPSEEK_API_KEY",
-      "voice_id": "",
+      "voice_id": "53f8d7dbf7f14a59aa2db2f8aa1725d3",
       "voice_sim": {
         "pitch": 1.35,
         "rate": 1.05,
         "voice": "Xiaoxiao|Xiaoyi|Huihui|Tingting|Female"
       },
-      "art": "bust"
+      "art": "bust",
+      "voice_name": "Lea outside walking"
     },
     {
       "code": "C03",
@@ -80,14 +82,15 @@
       "color": "#7d8cc4",
       "type": "llm",
       "base_url": "https://api.moonshot.cn/v1",
-      "model": "kimi-latest",
+      "model": "kimi-k3",
       "api_key_env": "MOONSHOT_API_KEY",
-      "voice_id": "",
+      "voice_id": "1c651b8254304a298f6f35585f2e1d04",
       "voice_sim": {
         "pitch": 1.0,
         "rate": 0.95,
         "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
-      }
+      },
+      "voice_name": "Ceecee - Soothing"
     },
     {
       "code": "C04",
@@ -97,14 +100,15 @@
       "color": "#6a5cff",
       "type": "llm",
       "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-      "model": "qwen-plus",
+      "model": "qwen3.8-flash",
       "api_key_env": "DASHSCOPE_API_KEY",
-      "voice_id": "",
+      "voice_id": "1803df59c37443789d2e4f71c82859a0",
       "voice_sim": {
         "pitch": 1.1,
         "rate": 0.9,
         "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
-      }
+      },
+      "voice_name": "Lea inside sitting down"
     },
     {
       "code": "C05",
@@ -114,14 +118,15 @@
       "color": "#5b6b8c",
       "type": "llm",
       "base_url": "https://open.bigmodel.cn/api/paas/v4",
-      "model": "glm-4-flash",
+      "model": "glm-5.3-flash",
       "api_key_env": "ZHIPU_API_KEY",
-      "voice_id": "",
+      "voice_id": "6c364011f30747c9a0a89eec3787cadc",
       "voice_sim": {
         "pitch": 0.95,
         "rate": 0.9,
         "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
-      }
+      },
+      "voice_name": "Shuxian - Clear & Trustworthy"
     },
     {
       "code": "C06",
@@ -216,15 +221,16 @@
       "color": "#6a8cff",
       "type": "llm",
       "base_url": "https://ark.cn-beijing.volces.com/api/v3",
-      "model": "doubao-seed-1-6-250615",
+      "model": "doubao-seed-2-0-lite-260428",
       "api_key_env": "ARK_API_KEY",
-      "voice_id": "",
+      "voice_id": "1776ddbd05374fa480e92f0297bbc67e",
       "voice_sim": {
         "pitch": 1.5,
         "rate": 1.05,
         "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
       },
-      "art": "bust"
+      "art": "bust",
+      "voice_name": "Melissa - Friendly"
     },
     {
       "code": "C12",
@@ -302,14 +308,15 @@
       "color": "#d43a3a",
       "type": "llm",
       "base_url": "https://api.hunyuan.cloud.tencent.com/v1",
-      "model": "hunyuan-turbos-latest",
+      "model": "hy4-preview",
       "api_key_env": "HUNYUAN_API_KEY",
-      "voice_id": "",
+      "voice_id": "080f8e5cb3ae424989242b0efe5205e6",
       "voice_sim": {
         "pitch": 1.0,
         "rate": 1.0,
         "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
-      }
+      },
+      "voice_name": "Ceecee - Serious"
     },
     {
       "code": "C17",
@@ -389,12 +396,13 @@
       "base_url": "https://api.xiaomimimo.com/v1",
       "model": "mimo-v2.6-flash",
       "api_key_env": "MIMO_API_KEY",
-      "voice_id": "",
+      "voice_id": "dd00b0b9c5284a20bcdb5d1d1802362f",
       "voice_sim": {
         "pitch": 1.35,
         "rate": 1.1,
         "voice": "Xiaoyi|Xiaoxiao|Huihui|Female"
-      }
+      },
+      "voice_name": "Lea on balcony"
     },
     {
       "code": "C22",
@@ -404,15 +412,16 @@
       "color": "#ff8a2a",
       "type": "llm",
       "base_url": "https://api.stepfun.com/v1",
-      "model": "step-3.7-flash",
+      "model": "step-5-preview",
       "api_key_env": "STEPFUN_API_KEY",
-      "voice_id": "",
+      "voice_id": "4f8c25eb83f4488d82c2a2e38dc0a9d3",
       "voice_sim": {
         "pitch": 0.8,
         "rate": 1.05,
         "voice": "Yunxi|Yunyang|Kangkang|Male"
       },
-      "art": "bust"
+      "art": "bust",
+      "voice_name": "Haoran - Bright & Articulate"
     }
   ],
   "tts": {

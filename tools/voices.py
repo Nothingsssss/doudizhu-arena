@@ -96,8 +96,7 @@ def fetch_all(path, params):
     for _ in range(200):
         p = dict(params)
         if cursor:
-            p["cursor"] = cursor
-            p["next_token"] = cursor
+            p["token"] = cursor
         body = get(path, p)
         items, meta = items_of(body)
         new = [x for x in items if pick_field(x, "voice_id", "id") not in seen]
