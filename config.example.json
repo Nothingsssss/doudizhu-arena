@@ -1,0 +1,96 @@
+{
+  "port": 8000,
+  "arena": {
+    "format": "tournament",
+    "entrants": 9,
+    "games_per_table": 3,
+    "move_delay": 1.5,
+    "game_pause": 8,
+    "round_pause": 12,
+    "champion_pause": 30,
+    "only_with_art": true,
+    "max_games": null
+  },
+  "players": [
+    {
+      "name": "DeepSeek",
+      "type": "llm",
+      "base_url": "https://api.deepseek.com/v1",
+      "model": "deepseek-flash",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "color": "#4f8cff",
+      "voice_id": "",
+      "live2d": {
+        "model": "live2d/models/deepseek/deepseek.model3.json",
+        "scale": 1.6,
+        "y": -0.5
+      }
+    },
+    {
+      "name": "通义千问",
+      "type": "llm",
+      "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "model": "qwen-plus",
+      "api_key_env": "DASHSCOPE_API_KEY",
+      "color": "#a66bff",
+      "voice_id": ""
+    },
+    {
+      "name": "Kimi",
+      "type": "llm",
+      "base_url": "https://api.moonshot.cn/v1",
+      "model": "kimi-latest",
+      "api_key_env": "MOONSHOT_API_KEY",
+      "color": "#2fd3a0",
+      "voice_id": ""
+    },
+    {
+      "name": "GPT",
+      "type": "llm",
+      "base_url": "https://api.openai.com/v1",
+      "model": "gpt-4o-mini",
+      "api_key_env": "OPENAI_API_KEY",
+      "color": "#ff8a4c",
+      "voice_id": ""
+    },
+    {
+      "name": "本地Ollama",
+      "type": "llm",
+      "base_url": "http://localhost:11434/v1",
+      "model": "qwen2.5:14b",
+      "timeout": 120,
+      "color": "#ffb020",
+      "voice_id": ""
+    },
+    {
+      "name": "机器人",
+      "type": "bot",
+      "color": "#8a94b8"
+    }
+  ],
+  "tts": {
+    "provider": "heygen",
+    "model": "heygen-voice-1-turbo-free",
+    "api_key_env": "HEYGEN_API_KEY",
+    "timeout": 30,
+    "fallback": "browser"
+  },
+  "tts_custom_example": {
+    "_说明": "想换成别的语音接口时，把这段改名为 tts 并按接口文档填写。下面是 OpenAI /audio/speech 的写法（返回的就是音频）",
+    "provider": "custom",
+    "url": "https://api.openai.com/v1/audio/speech",
+    "headers": {
+      "Authorization": "Bearer ${OPENAI_API_KEY}"
+    },
+    "required_env": [
+      "OPENAI_API_KEY"
+    ],
+    "body": {
+      "model": "gpt-4o-mini-tts",
+      "voice": "{voice_id}",
+      "input": "{text}",
+      "response_format": "mp3"
+    },
+    "fallback": "browser"
+  }
+}

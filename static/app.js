@@ -1,0 +1,1266 @@
+(() => {
+"use strict";
+
+/* ================= 常量 ================= */
+const NAMES = { 3: "3", 4: "4", 5: "5", 6: "6", 7: "7", 8: "8", 9: "9", 10: "10", 11: "J", 12: "Q", 13: "K", 14: "A", 15: "2", 16: "小王", 17: "大王" };
+const suit = (s) => `<svg class="su"><use href="#su${s}"/></svg>`;
+const JESTER = `<svg class="su" viewBox="0 0 100 120"><use href="#jester"/></svg>`;
+const PALETTE = ["#4f8cff", "#ff5f7e", "#2fd3a0", "#a66bff", "#ffb020", "#ff6fb5", "#22c1ee", "#8bd448", "#ff8a4c", "#7a7dff"];
+const BIG_TEXT = { bomb: "炸弹", rocket: "王炸", plane: "飞机", plane_single: "飞机", plane_pair: "飞机", straight: "顺子", pair_straight: "连对",
+  four_two_single: "四带二", four_two_pair: "四带两对", trio: "三张", trio_single: "三带一", trio_pair: "三带二" };
+const CROWN = `<svg class="crown" viewBox="0 0 64 44"><defs><linearGradient id="cg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3b0"/><stop offset=".55" stop-color="#ffc83d"/><stop offset="1" stop-color="#ff8a00"/></linearGradient></defs><path d="M4 14 L18 26 L32 4 L46 26 L60 14 L54 40 L10 40 Z" fill="url(#cg)" stroke="#a85a00" stroke-width="2" stroke-linejoin="round"/><circle cx="32" cy="4" r="4" fill="#ff4d6d"/><circle cx="4" cy="14" r="3.5" fill="#3ee7ff"/><circle cx="60" cy="14" r="3.5" fill="#3ee7ff"/><rect x="10" y="33" width="44" height="7" fill="#ffdd6b" opacity=".7"/></svg>`;
+const Q = new URLSearchParams(location.search);
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const num = (n) => Number(n || 0).toLocaleString("en-US");
+
+/* ================= 状态 ================= */
+const G = {
+  live: false, profiles: {}, snap: null, gameNo: 0, match: null, bracket: null, bid: 0, mult: 1, landlord: -1, phase: "等待开局",
+  roles: [null, null, null], bottom: [], used: {}, turn: -1, endSeq: 0, think: null,
+  seats: [0, 1, 2].map(() => ({ name: "", hand: [], played: null, label: "", kind: "", hot: false, thinking: false, t0: 0, alarmed: false, typing: null })),
+};
+
+/* ================= 颜色 / 头像 ================= */
+function hash(s) { let h = 0; for (const ch of String(s)) h = (h * 31 + ch.codePointAt(0)) >>> 0; return h; }
+const prof = (name) => G.profiles[name] || {};
+function colorOf(name) { return prof(name).color || PALETTE[hash(name) % PALETTE.length]; }
+function hexRgb(hex) { const m = hex.replace("#", ""); const n = parseInt(m.length === 3 ? m.replace(/./g, "$&$&") : m, 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function pcVars(name) {
+  let [r, g, b] = [79, 140, 255];
+  try { [r, g, b] = hexRgb(colorOf(name)); } catch (e) { /* 非法颜色用默认 */ }
+  const d = (x) => Math.round(x * 0.45);
+  return `--pc:rgb(${r},${g},${b});--pc2:rgb(${d(r)},${d(g)},${d(b)});--pcg:rgba(${r},${g},${b},.6)`;
+}
+function initial(name) { const s = String(name || "?").trim(); return esc(Array.from(s)[0] || "?").toUpperCase(); }
+function emblemHtml(name) {
+  const p = prof(name);
+  return `<div class="emblem"><div class="hex"></div><b>${initial(name)}</b><small>${esc(p.title || name || "")}</small></div>`;
+}
+// 图片加载失败时换成徽章
+window.__avErr = (img) => { const art = img.closest(".art"); if (art) { art.className = "art"; art.innerHTML = emblemHtml(art.dataset.name); } else img.replaceWith(document.createTextNode(img.dataset.i || "?")); };
+// 立绘先不给 src，处理完（去背景、裁边、裁脸）再填进去，避免先闪一下白底原图
+function artHtml(name) {
+  const av = prof(name).avatar;
+  return av ? `<img data-art="${esc(av)}" data-name="${esc(name)}" alt="">` : emblemHtml(name);
+}
+function artCls(name) {
+  const p = prof(name);
+  if (!p.avatar) return "art";
+  return "art" + (p.art === "bust" ? "" : " full") + (p.cutout === false ? " masked" : "");
+}
+function mini(name, cls = "") {
+  const av = prof(name).avatar;
+  return `<div class="mini ${cls}" style="${pcVars(name)}">${av ? `<img data-face="${esc(av)}" data-name="${esc(name)}" data-i="${initial(name)}" alt="">` : initial(name)}</div>`;
+}
+
+/* ================= 立绘处理 =================
+ * 形象图多是白底全身立绘，这里在浏览器里处理一次并缓存：
+ *   1. cutout="auto"：从图片四边往里找和背景同色的连通区域，变成透明（人物的描边会挡住，衣服里的白色不受影响）
+ *   2. 裁掉四周透明边，让人物顶到框
+ *   3. 裁出脸部方图给排行榜、战况、结算用（找人物最上面一段够宽的地方当头，细长的武器、法杖不算；可用 face 手动指定） */
+const ART = new Map();
+const loadImg = (src) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+const toUrl = (cv) => new Promise((res) => cv.toBlob((b) => res(b ? URL.createObjectURL(b) : cv.toDataURL()), "image/png"));
+function removeBg(d, W, H) {
+  const at = (x, y) => (y * W + x) * 4;
+  const corners = [at(0, 0), at(W - 1, 0), at(0, H - 1), at(W - 1, H - 1)];
+  if (corners.every((i) => d[i + 3] < 20)) return;            // 已经是透明底
+  const samples = [];
+  for (let x = 0; x < W; x += Math.max(1, W >> 5)) samples.push(at(x, 0), at(x, H - 1));
+  for (let y = 0; y < H; y += Math.max(1, H >> 5)) samples.push(at(0, y), at(W - 1, y));
+  const med = (o) => samples.map((i) => d[i + o]).sort((a, b) => a - b)[samples.length >> 1];
+  const br = med(0), bgc = med(1), bb = med(2), T = 2700;
+  const dist = (i) => { const r = d[i] - br, g = d[i + 1] - bgc, b = d[i + 2] - bb; return r * r + g * g + b * b; };
+  const seen = new Uint8Array(W * H), st = [];
+  const push = (x, y) => { const p = y * W + x; if (!seen[p] && d[p * 4 + 3] > 0 && dist(p * 4) < T) { seen[p] = 1; st.push(p); } };
+  for (let x = 0; x < W; x++) { push(x, 0); push(x, H - 1); }
+  for (let y = 0; y < H; y++) { push(0, y); push(W - 1, y); }
+  while (st.length) {
+    const p = st.pop(), x = p % W, y = (p / W) | 0;
+    d[p * 4 + 3] = 0;
+    if (x > 0) push(x - 1, y); if (x < W - 1) push(x + 1, y); if (y > 0) push(x, y - 1); if (y < H - 1) push(x, y + 1);
+  }
+  // 边缘羽化：紧挨背景、颜色又接近背景的像素半透明，去掉白边
+  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+    const p = y * W + x, i = p * 4;
+    if (seen[p] || !(seen[p - 1] || seen[p + 1] || seen[p - W] || seen[p + W])) continue;
+    const k = dist(i);
+    if (k < T * 4) d[i + 3] = Math.min(d[i + 3], Math.round(255 * Math.sqrt(k / (T * 4))));
+  }
+}
+async function processArt(src, p) {
+  const img = await loadImg(src);
+  const k = Math.min(1, 1200 / img.naturalHeight);
+  const W = Math.max(1, Math.round(img.naturalWidth * k)), H = Math.max(1, Math.round(img.naturalHeight * k));
+  const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+  const g = cv.getContext("2d", { willReadFrequently: true });
+  g.drawImage(img, 0, 0, W, H);
+  let id;
+  try { id = g.getImageData(0, 0, W, H); } catch (e) { return { full: src, face: src, raw: true }; }   // 跨域图片读不了像素，原样用
+  const d = id.data;
+  if (p.cutout === "auto" || p.cutout === undefined) removeBg(d, W, H);
+  g.putImageData(id, 0, 0);
+  // 人物外框
+  let x0 = W, x1 = -1, y0 = H, y1 = -1;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (d[(y * W + x) * 4 + 3] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  if (x1 < 0) return { full: src, face: src, raw: true };
+  const pad = Math.round(H * 0.01);
+  x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(W - 1, x1 + pad); y1 = Math.min(H - 1, y1 + pad);
+  const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+  const full = document.createElement("canvas"); full.width = bw; full.height = bh;
+  full.getContext("2d").drawImage(cv, x0, y0, bw, bh, 0, 0, bw, bh);
+  // 脸
+  let fx, fy, fs;
+  if (Array.isArray(p.face) && p.face.length >= 2) {
+    fx = (p.face[0] / 100) * W; fy = (p.face[1] / 100) * H; fs = ((p.face[2] || 16) / 100) * H;
+  } else {
+    let top = y0;
+    for (let y = y0; y < y1; y++) {
+      let n = 0; for (let x = x0; x <= x1; x++) if (d[(y * W + x) * 4 + 3] > 24) n++;
+      if (n > bw * 0.12) { top = y; break; }
+    }
+    let sx = 0, n = 0;
+    for (let y = top; y < Math.min(y1, top + bh * 0.1); y++) for (let x = x0; x <= x1; x++) if (d[(y * W + x) * 4 + 3] > 24) { sx += x; n++; }
+    fx = n ? sx / n : (x0 + x1) / 2; fs = Math.min(bh * 0.17, bw); fy = top + fs * 0.48;
+  }
+  const fc = document.createElement("canvas"); fc.width = fc.height = 256;
+  const sheet = p.faces ? await sheetFace(p.faces).catch(() => null) : null;
+  if (sheet) fc.getContext("2d").drawImage(sheet.img, sheet.x, sheet.y, sheet.s, sheet.s, 0, 0, 256, 256);
+  else fc.getContext("2d").drawImage(cv, fx - fs / 2, fy - fs / 2, fs, fs, 0, 0, 256, 256);
+  return { full: await toUrl(full), face: await toUrl(fc) };
+}
+// 表情图：2 行 5 列的头像表，取第一格（平常表情），裁成头到肩的方图
+async function sheetFace(src) {
+  const img = await loadImg(src);
+  const cw = img.naturalWidth / 5, ch = img.naturalHeight / 2;
+  const cv = document.createElement("canvas"); cv.width = Math.round(cw); cv.height = Math.round(ch);
+  const g = cv.getContext("2d", { willReadFrequently: true });
+  g.drawImage(img, 0, 0, cw, ch, 0, 0, cv.width, cv.height);
+  const W = cv.width, H = cv.height, d = g.getImageData(0, 0, W, H).data;
+  let x0 = W, x1 = -1, y0 = H;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (d[(y * W + x) * 4 + 3] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; }
+  if (x1 < 0) return null;
+  const s = Math.min(Math.max(x1 - x0 + 1, H * 0.6), H - y0, W);
+  const x = Math.max(0, Math.min(W - s, (x0 + x1) / 2 - s / 2));
+  return { img, x, y: Math.max(0, y0 - s * 0.02), s };
+}
+/* ================= 表情 =================
+ * 表情图是 2 行 5 列，所有角色顺序一样：
+ *   0 平常  1 开心  2 思考  3 惊讶  4 生气  5 委屈  6 大笑  7 得意  8 害羞  9 兴奋
+ * 牌桌上每个立绘旁有个圆形表情框，跟着出牌切换，几秒后回到平常；结算时的表情一直保持到下一局。 */
+const EXPR = { calm: 0, happy: 1, think: 2, shock: 3, angry: 4, sad: 5, laugh: 6, smug: 7, shy: 8, hype: 9 };
+const exprTimers = [0, 0, 0];
+function setExpr(i, mood, ms = 2600) {
+  const k = typeof mood === "number" ? mood : EXPR[mood] ?? 0;
+  l2dMood(i, k);
+  const el = $("seat" + i) && $("seat" + i).querySelector(".expr");
+  if (!el) {
+    clearTimeout(exprTimers[i]);
+    if (ms > 0 && k !== 0) exprTimers[i] = setTimeout(() => setExpr(i, 0, 0), ms);
+    return;
+  }
+  const p = prof(G.seats[i].name);
+  const face = el.querySelector("i");
+  if (!face.style.backgroundImage) face.style.backgroundImage = `url("${p.faces}")`;
+  face.style.backgroundPosition = `${(k % 5) * 25}% ${k < 5 ? 0 : 100}%`;
+  if (el.dataset.k !== String(k)) { el.dataset.k = k; el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
+  clearTimeout(exprTimers[i]);
+  if (ms > 0 && k !== 0) exprTimers[i] = setTimeout(() => setExpr(i, 0, 0), ms);
+}
+const others = (i) => [0, 1, 2].filter((j) => j !== i);
+function exprPlay(d) {
+  const i = d.seat, k = d.kind || "";
+  if (!d.cards.length) { l2dAct(i, "shake"); return setExpr(i, "sad"); }
+  if (k === "rocket" || k === "bomb") {
+    setExpr(i, "smug", 3200);
+    l2dAct(i, "tilt");
+    others(i).forEach((j) => setExpr(j, G.roles[j] && G.roles[j] === G.roles[i] ? "laugh" : "shock", 3200));
+    return;
+  }
+  if (k.startsWith("plane") || k === "straight" || k === "pair_straight" || k.startsWith("four")) return setExpr(i, "hype");
+  setExpr(i, Math.random() < 0.5 ? "happy" : "shy", 2000);
+}
+
+/* ================= Live2D（可选） =================
+ * 角色配置里写了 live2d.model（model3.json）时，牌桌上的立绘换成 Live2D 模型（官方 Cubism SDK，见 live2d/README.md）。
+ * live2d.js、Cubism Core、WebGL、模型文件任何一个不可用，都继续显示原来的立绘图片。?l2d=0 关闭。 */
+const L2D = { on: Q.get("l2d") !== "0", api: null, loading: null, seatIds: ["", "", ""] };
+// 表情图的 10 种表情 → Live2D 的 8 种情绪
+const MOOD_EMOTION = ["neutral", "happy", "thinking", "surprised", "angry", "sad", "happy", "confident", "shy", "happy"];
+function l2dApi() {
+  if (!L2D.on) return Promise.resolve(null);
+  if (L2D.loading) return L2D.loading;
+  L2D.loading = new Promise((res) => {
+    if (window.Live2D) return res(window.Live2D);
+    const s = document.createElement("script");
+    s.src = "live2d/live2d.js";
+    s.onload = () => res(window.Live2D || null);
+    s.onerror = () => res(null);
+    document.head.appendChild(s);
+  }).then((api) => {
+    if (!api) { console.warn("[Live2D] live2d/live2d.js 加载失败，使用立绘图片"); return null; }
+    if (!api.webglSupport().webgl) { console.warn("[Live2D] 浏览器不支持 WebGL，使用立绘图片"); return null; }
+    api.setAudioContextProvider(() => FX.ctx());   // 和音效共用一个 AudioContext
+    return api.loadCore().then(() => { api.registry.maxActive = 4; return (L2D.api = api); },
+      (e) => { console.warn("[Live2D]", e.message); return null; });
+  });
+  return L2D.loading;
+}
+const l2dKey = (name) => prof(name).id || name;
+function l2dCtrl(i) {
+  if (!L2D.api || !L2D.seatIds[i]) return null;
+  const c = L2D.api.registry.get(L2D.seatIds[i]);
+  return c && c.ready ? c : null;
+}
+function l2dCtrlByName(name) { const i = G.seats.findIndex((s) => s.name === name); return i >= 0 ? l2dCtrl(i) : null; }
+function mountL2D(i) {
+  const s = G.seats[i], cfg = prof(s.name).live2d;
+  L2D.seatIds[i] = "";
+  if (!s.name || !cfg || !cfg.model || !L2D.on) return;
+  const portrait = $("seat" + i).querySelector(".portrait");
+  const holder = document.createElement("div");
+  holder.className = "l2d";
+  portrait.appendChild(holder);
+  const key = l2dKey(s.name);
+  l2dApi().then((api) => {
+    if (!api || !holder.isConnected) return null;
+    if (!api.registry.has(key)) api.registry.register({ id: key, name: s.name, ...cfg });
+    return api.registry.mount(key, holder);
+  }).then((ctrl) => {
+    if (!ctrl || !holder.isConnected) return;
+    L2D.seatIds[i] = key;
+    portrait.classList.add("l2d-on");
+    const ex = $("seat" + i).querySelector(".expr");
+    ctrl.setEmotion(MOOD_EMOTION[+(ex && ex.dataset.k) || 0] || "neutral");
+  }).catch((e) => {
+    console.warn(`[Live2D] ${s.name} 模型加载失败，继续用立绘：${e.message}`);
+    holder.remove();
+  });
+}
+function l2dRetain() { if (L2D.api) L2D.api.registry.retain(G.seats.map((s) => l2dKey(s.name))); }
+function l2dMood(i, k) { const c = l2dCtrl(i); if (c) c.setEmotion(MOOD_EMOTION[k] || "neutral"); }
+function l2dAct(i, a) { const c = l2dCtrl(i); if (c) c.interact(a).catch(() => {}); }
+function l2dStopAll() { for (let i = 0; i < 3; i++) { const c = l2dCtrl(i); if (c) c.stopSpeaking(); } }
+
+function artOf(name, src) {
+  if (!ART.has(src)) {
+    const pr = processArt(src, prof(name)).catch(() => null);
+    pr.then((r) => (pr.ready = r));     // 处理完后同步可取（大招特写用）
+    ART.set(src, pr);
+  }
+  return ART.get(src);
+}
+function hydrate(root) {
+  root.querySelectorAll("img[data-art]:not([src]), img[data-face]:not([src])").forEach((img) => {
+    const src = img.dataset.art || img.dataset.face;
+    artOf(img.dataset.name, src).then((r) => {
+      if (!r) return window.__avErr(img);
+      img.src = img.dataset.art ? r.full : r.face;
+      if (!r.raw && img.dataset.face) img.classList.add("face");
+    });
+  });
+}
+new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) hydrate(n); })
+  .observe(document.getElementById("stage"), { childList: true, subtree: true });
+
+/* ================= 场景（赛博城市 / 全息牌桌） ================= */
+const NEON = ["#3ee7ff", "#ff2bd6", "#fcee0a", "#7a5cff"];
+function skyline(seed, y, minH, maxH, w0, w1, fill, winOp) {
+  let s = "", x = -30, k = 0;
+  while (x < 1940) {
+    const w = w0 + (hash(seed + "w" + k) % (w1 - w0)), h = minH + (hash(seed + "h" + k) % (maxH - minH));
+    s += `<rect x="${x}" y="${y - h}" width="${w}" height="${h}" fill="${fill}"/>`;
+    // 窗户灯：一格一格的小亮点
+    for (let wy = y - h + 12; wy < y - 8; wy += 14) for (let wx = x + 6; wx < x + w - 6; wx += 12) {
+      const v = hash(seed + wx + "," + wy) % 100;
+      if (v < 16) s += `<rect x="${wx}" y="${wy}" width="5" height="3" fill="${NEON[v % 4]}" opacity="${winOp * (0.4 + (v % 5) / 8)}"/>`;
+    }
+    if (hash(seed + "a" + k) % 5 === 0) s += `<line x1="${x + w / 2}" y1="${y - h}" x2="${x + w / 2}" y2="${y - h - 30}" stroke="${fill}" stroke-width="3"/><circle cx="${x + w / 2}" cy="${y - h - 32}" r="3" fill="#ff2bd6" class="blink"/>`;
+    x += w + 4 + (hash(seed + "g" + k) % 10); k++;
+  }
+  return s;
+}
+function buildScene() {
+  const H0 = 470;      // 地平线
+  let stars = "";
+  for (let k = 0; k < 60; k++) stars += `<rect x="${hash("x" + k) % 1920}" y="${hash("y" + k) % 300}" width="2" height="2" fill="${k % 3 ? "#bfe8ff" : "#ffb3f0"}" opacity="${0.2 + (k % 5) * 0.12}"/>`;
+  let sunCut = "";
+  for (let k = 0; k < 8; k++) sunCut += `<rect x="0" y="${H0 - 150 + k * 22 + k * k * 0.8}" width="1920" height="${2 + k * 1.6}" fill="#000"/>`;
+  // 霓虹招牌
+  const sign = (x, y, w, h, c, t, fs, vert) => `<g filter="url(#neon)"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="rgba(5,2,20,.85)" stroke="${c}" stroke-width="3"/>
+    <text x="${x + w / 2}" y="${y + h / 2}" fill="${c}" font-size="${fs}" font-weight="900" text-anchor="middle" dominant-baseline="central" font-family="Arial Black, Microsoft YaHei, sans-serif" ${vert ? `writing-mode="tb" letter-spacing="6"` : `letter-spacing="4"`}>${t}</text></g>`;
+  $("scene").innerHTML = `<defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#03010c"/><stop offset=".25" stop-color="#0b0526"/><stop offset=".40" stop-color="#25083f"/><stop offset=".435" stop-color="#5a0f5c"/><stop offset=".44" stop-color="#05020f"/><stop offset="1" stop-color="#020108"/></linearGradient>
+    <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fcee0a"/><stop offset=".45" stop-color="#ff7a3c"/><stop offset="1" stop-color="#ff2bd6"/></linearGradient>
+    <mask id="sunMask"><rect width="1920" height="1080" fill="#fff"/>${sunCut}</mask>
+    <radialGradient id="haze" cx=".4" cy=".43" r=".55"><stop offset="0" stop-color="#ff2bd6" stop-opacity=".38"/><stop offset=".5" stop-color="#7a5cff" stop-opacity=".12"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+    <filter id="neon" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="blur6"><feGaussianBlur stdDeviation="6"/></filter>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#sky)"/>${stars}
+  <circle cx="765" cy="${H0 - 70}" r="250" fill="url(#sun)" mask="url(#sunMask)" opacity=".6"/>
+  <circle cx="765" cy="${H0 - 70}" r="270" fill="none" stroke="#ff2bd6" stroke-width="2" opacity=".25" filter="url(#blur6)"/>
+  <g opacity=".9">${skyline("far", H0, 60, 170, 40, 90, "#140a33", 0.6)}</g>
+  <g>${skyline("near", H0 + 4, 120, 330, 60, 140, "#07041a", 1)}</g>
+  ${sign(118, 150, 60, 200, "#ff2bd6", "争霸", 40, true)}${sign(1290, 120, 220, 64, "#3ee7ff", "TOKEN", 40)}${sign(1420, 230, 54, 170, "#fcee0a", "斗地主", 30, true)}${sign(250, 300, 170, 50, "#3ee7ff", "LIVE·24H", 26)}
+  <rect width="1920" height="1080" fill="url(#haze)"/>
+  <line x1="0" y1="${H0}" x2="1920" y2="${H0}" stroke="#ff2bd6" stroke-width="6" filter="url(#blur6)" opacity=".9"/>
+  <line x1="0" y1="${H0}" x2="1920" y2="${H0}" stroke="#ffd0f4" stroke-width="1.5"/>`;
+
+  // 牌桌：全息 HUD 圆环 + 电路纹
+  let ticks = "";
+  for (let k = 0; k < 72; k++) {
+    const a = (k / 72) * Math.PI * 2, r1 = k % 6 ? 0.965 : 0.93;
+    ticks += `<line x1="${745 + Math.cos(a) * 640 * r1}" y1="${340 + Math.sin(a) * 300 * r1}" x2="${745 + Math.cos(a) * 640}" y2="${340 + Math.sin(a) * 300}" stroke="#3ee7ff" stroke-width="${k % 6 ? 1.5 : 3}" opacity=".45"/>`;
+  }
+  const trace = (d, c) => `<path d="${d}" fill="none" stroke="${c}" stroke-width="2" opacity=".35"/>`;
+  const node = (x, y, c) => `<circle cx="${x}" cy="${y}" r="5" fill="none" stroke="${c}" stroke-width="2" opacity=".6"/>`;
+  $("tableArt").innerHTML = `
+    <defs><pattern id="hex" width="42" height="72.7" patternUnits="userSpaceOnUse" patternTransform="scale(.7)"><path d="M21 0 L42 12.1 L42 36.4 L21 48.5 L0 36.4 L0 12.1 Z M21 48.5 L21 72.7" fill="none" stroke="#3ee7ff" stroke-width="1.2" opacity=".14"/></pattern></defs>
+    <rect width="1490" height="700" fill="url(#hex)"/>
+    ${ticks}
+    <ellipse cx="745" cy="340" rx="600" ry="276" fill="none" stroke="#ff2bd6" stroke-width="2" opacity=".35" stroke-dasharray="40 10 4 10"/>
+    <ellipse cx="745" cy="340" rx="330" ry="150" fill="none" stroke="#3ee7ff" stroke-width="2.5" opacity=".45"/>
+    <ellipse cx="745" cy="340" rx="300" ry="134" fill="none" stroke="#3ee7ff" stroke-width="10" opacity=".1" stroke-dasharray="2 10"/>
+    ${trace("M120 340 H300 L340 300 H430", "#3ee7ff")}${trace("M1370 340 H1190 L1150 380 H1060", "#3ee7ff")}
+    ${trace("M260 180 L360 230 H470", "#ff2bd6")}${trace("M1230 500 L1130 450 H1020", "#ff2bd6")}
+    ${trace("M745 40 V120 M745 560 V640", "#fcee0a")}
+    ${node(430, 300, "#3ee7ff")}${node(1060, 380, "#3ee7ff")}${node(470, 230, "#ff2bd6")}${node(1020, 450, "#ff2bd6")}
+    <text x="745" y="372" text-anchor="middle" font-size="120" font-weight="900" fill="#3ee7ff" opacity=".07" letter-spacing="18" font-family="Arial Black, sans-serif">TOKEN</text>`;
+
+  // 漂浮的数据粒子
+  let em = "";
+  for (let k = 0; k < 40; k++) em += `<i style="left:${(hash("e" + k) % 1520)}px;--s:${2 + (k % 3)}px;--d:${8 + (k % 7)}s;--dl:-${(k * 0.7) % 9}s;--x:${(k % 2 ? 1 : -1) * (20 + (k * 13) % 80)}px;--c:${NEON[k % 3]}"></i>`;
+  $("embers").innerHTML = em;
+}
+
+/* ================= 扑克牌 ================= */
+function takeSuit(r) { if (r >= 16) return -1; const i = G.used[r] || 0; G.used[r] = i + 1; return i % 4; }
+function toCards(ranks) { return ranks.map((r) => ({ r, s: takeSuit(r) })); }
+const byDesc = (a, b) => b.r - a.r || a.s - b.s;
+const byAsc = (a, b) => a.r - b.r || a.s - b.s;
+const isRed = (c) => c.r === 17 || c.s === 1 || c.s === 3;
+
+function cardHtml(c, i) {
+  if (c.back) return `<div class="card back" style="--i:${i}"></div>`;
+  if (c.r >= 16) {
+    return `<div class="card joker ${c.r === 17 ? "red" : "black"}" style="--i:${i}"><div class="cr"><b>J<br>O<br>K<br>E<br>R</b></div><div class="cc">${JESTER}</div></div>`;
+  }
+  return `<div class="card${isRed(c) ? " red" : ""}" style="--i:${i}"><div class="cr"><b${c.r === 10 ? ' class="ten"' : ""}>${NAMES[c.r]}</b><i>${suit(c.s)}</i></div><div class="cc">${suit(c.s)}</div></div>`;
+}
+function cardsHtml(cards, perRow, cls = "", style = "") {
+  let html = `<div class="cards ${cls}" style="${style}">`, i = 0;
+  for (let k = 0; k < cards.length; k += perRow) {
+    html += `<div class="row">` + cards.slice(k, k + perRow).map((c) => cardHtml(c, i++)).join("") + `</div>`;
+  }
+  return html + `</div>`;
+}
+function chipsHtml(cards) {
+  return `<span class="cks">` + cards.slice().sort(byAsc).map((c) => c.r >= 16
+    ? `<span class="ck jk">${c.r === 17 ? "大王" : "小王"}</span>`
+    : `<span class="ck${isRed(c) ? " r" : ""}">${NAMES[c.r]}</span>`).join("") + `</span>`;
+}
+function fmtRanks(ranks) { return ranks.length ? ranks.slice().sort((a, b) => a - b).map((r) => NAMES[r]).join(" ") : "不要"; }
+
+/* ================= 座位 ================= */
+function buildSeat(i) {
+  const s = G.seats[i], el = $("seat" + i), p = prof(s.name);
+  el.style.cssText = pcVars(s.name);
+  const meta = [p.title, p.model].filter(Boolean).map(esc).join(" · ");
+  el.innerHTML = `
+    <div class="portrait"><div class="aura"></div><div class="${artCls(s.name)}" data-name="${esc(s.name)}">${artHtml(s.name)}</div>${CROWN}</div>
+    <div class="alarm-light"></div>
+    <div class="plate">
+      ${p.faces ? `<div class="expr"><i></i></div>` : ""}
+      <div class="pstack">
+        <div class="prole"><div class="role wait"><span>叫分中</span></div><span class="stk"></span></div>
+        <div class="nameplate"><span class="chip">P${i + 1}</span><b class="name">${esc(s.name || "等待入座")}</b></div>
+        <div class="subrow"><div class="scoreplate">积分 <b class="score">0</b></div><div class="countplate"><i class="cb"></i><b class="cnt">0</b>张</div></div>
+        <div class="modelline">${meta}</div>
+      </div>
+    </div>
+    <div class="hand"></div>`;
+  mountL2D(i);
+}
+function updateSeat(i) {
+  const s = G.seats[i], el = $("seat" + i);
+  const role = G.roles[i];
+  el.classList.toggle("turn", G.turn === i);
+  el.classList.toggle("landlord", role === "地主");
+  el.classList.toggle("alarm", s.hand.length > 0 && s.hand.length <= 2 && role !== null);
+  const st = G.snap && G.snap.stats && G.snap.stats[s.name];
+  const r = el.querySelector(".role");
+  if (r) {
+    r.className = "role " + (role === "地主" ? "dz" : role === "农民" ? "nm" : "wait");
+    r.innerHTML = `<span>${role || (s.name ? "叫分中" : "等待")}</span>`;
+  }
+  const sc = el.querySelector(".score"); if (sc) sc.textContent = st ? num(st.score) : "0";
+  const c = el.querySelector(".cnt"); if (c) c.textContent = s.hand.length;
+  const k = el.querySelector(".stk"); if (k) k.innerHTML = st && st.streak >= 2 ? `<span class="streak">${st.streak}连胜</span>` : "";
+}
+function renderHand(i, anim) {
+  const s = G.seats[i];
+  const h = $("seat" + i).querySelector(".hand");
+  if (!h) return;
+  const cards = s.hand.slice().sort(byDesc), deal = anim && G.live ? " deal" : "";
+  if (i === 2) {
+    const cs = cards.length > 1 ? Math.min(56, (1100 - 100) / (cards.length - 1)) : 56;
+    h.innerHTML = cardsHtml(cards, 20, "sz-l" + deal, `--cs:${cs.toFixed(1)}px`);
+  } else h.innerHTML = cardsHtml(cards, Math.max(9, Math.ceil(cards.length / 2)), "sz-s" + deal);   // 两家的手牌分两行，不挡立绘
+}
+function renderPlayed(i, anim) {
+  const s = G.seats[i], el = $("played" + i);
+  if (s.played === null) { el.innerHTML = ""; return; }
+  if (s.played === "pass") { el.innerHTML = `<div class="pass">不要</div>`; return; }
+  const showLabel = s.kind && s.kind !== "single" && s.kind !== "pair";
+  el.innerHTML = (showLabel ? `<div class="label${s.hot ? " hot" : ""}">${esc(s.label)}</div>` : "") +
+    cardsHtml(s.played.slice().sort(byAsc), s.played.length > 12 ? 10 : 20, "sz-m" + (anim && G.live ? " in" : ""));
+}
+function renderAllSeats() { for (let i = 0; i < 3; i++) updateSeat(i); }
+function showClock(i, on) { $("clock" + i).classList.toggle("show", on); if (!on) $("clock" + i).classList.remove("slow"); }
+
+/* ================= 气泡 ================= */
+function bubble(i, prefix, text, warn) {
+  const el = $("bubble" + i), s = G.seats[i];
+  clearInterval(s.typing);
+  if (!prefix && !text) { el.classList.remove("show"); return; }
+  el.classList.toggle("warn", !!warn);
+  el.innerHTML = prefix + `<span></span>`;
+  el.classList.add("show");
+  const span = el.querySelector("span"), chars = Array.from(text || "");
+  if (!G.live) { span.textContent = text || ""; return; }
+  let k = 0;
+  s.typing = setInterval(() => { span.textContent = chars.slice(0, ++k).join(""); if (k >= chars.length) clearInterval(s.typing); }, 35);
+}
+function hideBubbles() { for (let i = 0; i < 3; i++) bubble(i, "", ""); }
+function splitSay(say) {
+  // 机器人代打 / 接口出错的提示以 [ 开头
+  const m = String(say || "").match(/^\[(.*?)\](.*)$/);
+  return m ? { warn: true, text: "! " + m[1] + (m[2] || "") } : { warn: false, text: String(say || "") };
+}
+
+/* ================= 牌匾 / 侧栏 ================= */
+function setTop() {
+  const m = G.match;
+  $("gameNo").textContent = m ? m.game : G.gameNo || "-";
+  $("gameOf").textContent = m ? `/${m.of} 局` : "局";
+  $("mult").textContent = "×" + G.mult;
+  const b = G.bracket;
+  $("hudEdition").textContent = `第 ${(b && b.edition) || 1} 届`;
+  $("hudRound").textContent = m ? (m.round_name === "决赛" ? "决赛 · 3进1" : `${m.round_name} · ${LETTER[m.table]}桌`) : b && b.champion ? "冠军诞生" : "等待抽签";
+  $("feedHead").textContent = m ? `${matchLabel(m)} · ${G.phase}（倍数×${G.mult}）` : G.gameNo ? `第${G.gameNo}局 ${G.phase}` : "等待开局";
+}
+function setMult(m) {
+  if (m === G.mult) return;
+  const up = m > G.mult, no = G.gameNo; G.mult = m;
+  const pill = document.querySelector(".pchip.mult");
+  const land = () => {
+    if (no !== G.gameNo) return;
+    setTop(); pill.classList.remove("bump"); void pill.offsetWidth; pill.classList.add("bump");
+    if (G.live && up) {
+      const q = FX.at(pill);
+      FX.burst(q.x, q.y, { n: 60, colors: ["#fff6c0", "#ffd36b", "#ff9f43"], speed: [200, 800], g: 400 });
+      FX.ring(q.x, q.y, { c: "#ffd36b", vr: 800, w: 10, life: 0.5 }); sfx("big");
+    }
+  };
+  if (!G.live || !up) return land();
+  setTimeout(() => { if (G.live) FX.fly(`×${m}`, { x: 765, y: 420 }, FX.at(pill), 700, "mult", land); else land(); }, 1100);
+}
+function setPhase(t) { G.phase = t; $("phase").textContent = t; setTop(); }
+function setHint(t) { $("turnHint").textContent = t || ""; }
+
+/* ================= 赛程流程图 =================
+ * 最上面冠军，往下是决赛、6进3、9进6（9 人分 3 桌）。
+ * 每桌打完：晋级的亮青色、待定的黄色、淘汰的变灰；晋级的人用各自颜色的线连到上一层的位置。 */
+const LETTER = "ABCDEFGHI";
+const nextSize = (n) => (n <= 3 ? 1 : Math.max(3, Math.floor(Math.floor((n * 2) / 3) / 3) * 3));
+const roundName = (n) => (n <= 3 ? "决赛" : `${n}进${nextSize(n)}`);
+const signed = (v) => (v > 0 ? "+" : "") + v;
+function curTable(b) { const m = b && b.match; return m && b.rounds[m.round] ? b.rounds[m.round].tables[m.table] : null; }
+function renderBracket(snap) {
+  const b = snap && snap.bracket;
+  if (!b) return;
+  G.bracket = b;
+  const plan = b.plan && b.plan.length ? b.plan : [9, 6, 3, 1];
+  const m = b.match;
+  const live = snap.stats || {};
+  const rows = [];
+  for (let r = plan.length - 2; r >= 0; r--) {
+    const rd = b.rounds[r], n = plan[r];
+    const tables = rd ? rd.tables : Array.from({ length: Math.ceil(n / 3) }, () => ({ players: [null, null, null], games: 0, done: false }));
+    const groups = tables.map((t, ti) => {
+      const isLive = m && m.round === r && m.table === ti;
+      const slots = t.players.map((name) => {
+        if (!name) return `<div class="bs st-empty"><div class="mini q">?</div><b class="bsc">&nbsp;</b></div>`;
+        let st = "";
+        if (t.done) st = (t.advance || []).includes(name) ? "adv" : (t.pending || []).includes(name) ? "pend" : "out";
+        else if (isLive) st = "cur";
+        const sc = isLive && live[name] ? live[name].score : (t.scores || {})[name] ?? 0;
+        const showSc = t.games > 0 || isLive;
+        return `<div class="bs st-${st || "wait"}" data-n="${esc(name)}" data-r="${r}" style="${pcVars(name)}">${mini(name)}${n <= 3 ? `<span class="bnm">${esc(name)}</span>` : ""}<b class="bsc${showSc && sc < 0 ? " neg" : ""}">${showSc ? signed(sc) : "&nbsp;"}</b></div>`;
+      }).join("");
+      const tag = n <= 3 ? "决赛桌" : `${LETTER[ti]}桌`;
+      const prog = t.done ? "完赛" : isLive ? `第${m.game}/${m.of}局` : t.games ? `${t.games}/${b.games_per_table || 3}` : "待赛";
+      return `<div class="bg${isLive ? " live" : ""}${t.done ? " done" : ""}"><div class="bgh"><span>${tag}</span><em>${prog}</em></div><div class="bgs">${slots}</div></div>`;
+    }).join("");
+    const cls = n <= 3 ? "r-final" : n <= 6 ? "r-mid" : "r-first";
+    rows.push(`<div class="bk-row ${cls}" data-r="${r}"><div class="bk-lab"><b>${roundName(n)}</b></div><div class="bk-groups">${groups}</div></div>`);
+  }
+  const ch = b.champion;
+  const champ = `<div class="bk-row r-champ"><div class="bk-champ${ch ? " on" : ""}"${ch ? ` style="${pcVars(ch)}"` : ""}>
+      ${CROWN}${ch ? mini(ch) : `<div class="mini q">?</div>`}<span class="bnm">${ch ? esc(ch) : "冠军"}</span></div></div>`;
+  $("bracket").innerHTML = `<div class="bk"><svg class="bk-lines"></svg>${champ}${rows.join("")}</div>`;
+  $("bracketStage").textContent = `第 ${b.edition || 1} 届 · ${m ? `${m.round_name} 进行中` : ch ? "冠军诞生" : "抽签完成"}`;
+  requestAnimationFrame(() => drawBracketLines(b, plan));
+}
+function relPos(el, root) {
+  let x = 0, y = 0, e = el;
+  while (e && e !== root) { x += e.offsetLeft; y += e.offsetTop; e = e.offsetParent; }
+  return { x, y, w: el.offsetWidth, h: el.offsetHeight };
+}
+function drawBracketLines(b, plan) {
+  const root = $("bracket").querySelector(".bk"), svg = root && root.querySelector(".bk-lines");
+  if (!svg) return;
+  const W = root.offsetWidth, Hh = root.offsetHeight;
+  svg.setAttribute("viewBox", `0 0 ${W} ${Hh}`); svg.setAttribute("width", W); svg.setAttribute("height", Hh);
+  const rowEl = (r) => root.querySelector(`.bk-row[data-r="${r}"]`);
+  const champEl = root.querySelector(".bk-champ");
+  let out = "";
+  // 骨架：每层的桌子向上汇到一条总线，再连到上一层
+  for (let r = 0; r < plan.length - 1; r++) {
+    const lo = rowEl(r), hiGroups = r + 1 < plan.length - 1 ? [...rowEl(r + 1).querySelectorAll(".bg")] : [champEl];
+    if (!lo) continue;
+    const loG = [...lo.querySelectorAll(".bg")].map((g) => relPos(g, root)), hiG = hiGroups.map((g) => relPos(g, root));
+    const top = Math.min(...loG.map((g) => g.y)), bot = Math.max(...hiG.map((g) => g.y + g.h));
+    const bus = (top + bot) / 2;
+    const xs = loG.concat(hiG).map((g) => g.x + g.w / 2);
+    out += `<path class="sk" d="M${Math.min(...xs)} ${bus} H${Math.max(...xs)}"/>`;
+    loG.forEach((g) => (out += `<path class="sk" d="M${g.x + g.w / 2} ${g.y} V${bus}"/>`));
+    hiG.forEach((g) => (out += `<path class="sk" d="M${g.x + g.w / 2} ${g.y + g.h} V${bus}"/>`));
+    // 晋级的人：从自己的格子连到上一层的格子
+    const rd = b.rounds[r];
+    if (!rd) continue;
+    rd.tables.forEach((t) => (t.advance || []).forEach((name) => {
+      const a = lo.querySelector(`.bs[data-n="${CSS.escape(name)}"]`);
+      if (!a) return;
+      const pa = relPos(a, root), x1 = pa.x + pa.w / 2, y1 = pa.y;
+      let x2, y2;
+      if (r + 1 < plan.length - 1) {
+        const hiRow = rowEl(r + 1), bEl = hiRow && hiRow.querySelector(`.bs[data-n="${CSS.escape(name)}"]`);
+        if (bEl) { const pb = relPos(bEl, root); x2 = pb.x + pb.w / 2; y2 = pb.y + pb.h; }
+      } else if (b.champion === name) { const pc = relPos(champEl, root); x2 = pc.x + pc.w / 2; y2 = pc.y + pc.h; }
+      const c = colorOf(name);
+      if (x2 === undefined) { out += `<path class="fl" style="stroke:${c}" d="M${x1} ${y1} V${bus}"/>`; return; }
+      const my = (y1 + y2) / 2;
+      out += `<path class="fl" style="stroke:${c}" d="M${x1} ${y1} C${x1} ${my} ${x2} ${my} ${x2} ${y2}"/>`;
+    }));
+  }
+  svg.innerHTML = out;
+}
+
+/* ================= 实时战况 ================= */
+function trimFeed() { const f = $("feed"); while (f.children.length > 6) f.firstElementChild.remove(); }
+function feed(name, act, opts = {}) {
+  const f = $("feed");
+  dropThinking();
+  const d = document.createElement("div");
+  if (!name) { d.className = "fi sys"; d.textContent = act; }
+  else {
+    d.className = "fi" + (opts.hot ? " hot" : "");
+    d.innerHTML = `${mini(name)}<div class="body"><div class="line"><span class="who">${esc(name)}</span><span class="act${opts.pass ? " pass" : ""}">${esc(act)}</span>${opts.chips || ""}</div>` +
+      (opts.say ? `<span class="say">“${esc(opts.say)}”</span>` : "") + `</div>`;
+  }
+  f.appendChild(d); trimFeed();
+}
+function feedThinking(name, what) {
+  dropThinking();
+  const d = document.createElement("div");
+  d.className = "fi thinking"; d.id = "thinkRow";
+  d.innerHTML = `${mini(name)}<div class="body"><div class="line"><span class="who">${esc(name)}</span><span class="act">${what}</span><span class="dots"><i></i><i></i><i></i></span><span class="tm">0.0s</span></div></div>`;
+  $("feed").appendChild(d); trimFeed();
+}
+function dropThinking() { const t = $("thinkRow"); if (t) t.remove(); }
+function ticker(text, hot) {
+  const t = $("ticker"); t.querySelector("span").textContent = text;
+  if (hot && G.live) { t.classList.remove("hot"); void t.offsetWidth; t.classList.add("hot"); }
+}
+
+/* ================= 特效 ================= */
+const GOLD = ["#ffffff", "#fcee0a", "#3ee7ff", "#ff2bd6"];
+const FIRE = ["#fff6c0", "#ffd36b", "#ff9a1f", "#ff5a1f", "#ff2d2d"];
+const RAINBOW = ["#ff3d6e", "#ffcf3d", "#3dffb4", "#3dc8ff", "#b93dff", "#ffffff"];
+const FESTIVE = ["#ffffff", "#fcee0a", "#3ee7ff", "#ff2bd6", "#7a5cff", "#6dffb0"];
+const CYAN = ["#e8fbff", "#3ee7ff", "#3d7bff", "#8b5cff"];
+const CENTER = { x: 765, y: 520 };
+function fxAdd(el, ms) { $("fx").appendChild(el); setTimeout(() => el.remove(), ms); return el; }
+function big(text, cls, ms = 1900) { if (!G.live) return; const e = document.createElement("div"); e.className = "big " + cls; e.textContent = text; fxAdd(e, ms); }
+function toast(text, cls = "") { if (!G.live) return; const e = document.createElement("div"); e.className = "toast " + cls; e.textContent = text; fxAdd(e, 2300); }
+function petals(n) {
+  if (!G.live || !FX.LV) return;
+  for (let k = 0; k < Math.round(n * FX.AMT); k++) {
+    const e = document.createElement("div"); e.className = "petal";
+    e.style.cssText = `left:${Math.random() * 1920}px;--x:${(Math.random() - 0.5) * 400}px;--d:${2.5 + Math.random() * 2.5}s;animation-delay:${Math.random() * 1.2}s;background:${["#ff9ac8", "#ffc4de", "#ff6fae"][k % 3]}`;
+    fxAdd(e, 6000);
+  }
+}
+const later = (ms, fn) => setTimeout(() => { if (G.live) fn(); }, ms);
+function playPos(i) { const el = $("played" + i); return FX.at(el.querySelector(".cards") || el); }
+function seatPos(i) { return FX.at($("seat" + i).querySelector(".portrait")); }
+
+function playedCards(i) { return $("played" + i).querySelector(".cards"); }
+function rankCount(ranks) { const m = {}; ranks.forEach((r) => (m[r] = (m[r] || 0) + 1)); return m; }
+
+/* ================= 大招特写 =================
+ * 炸弹、王炸、报警、"大你" 时，把出牌人的立绘放大切到画面中间（见 cutin.js）。
+ * 图片优先用 static/avatars/<id>-<场景>.png（自己画/生成的场景图），没有就用全身立绘 + 表情图里对应的表情做眼部特写。 */
+const CUTIN_EXPR = { rocket: 6, bomb: 4, alarm: 9, beat: 7 };     // 大笑 / 生气（霸气）/ 兴奋 / 得意
+const CUTIN_ON = Q.get("cutin") !== "0";
+let lastBeatCutin = 0;
+function cutinPrepare(name) {
+  // 开局时预先处理图片，出炸弹时立刻就能用
+  const p = prof(name);
+  if (!p) return;
+  if (p.avatar) artOf(name, p.avatar);
+  if (p.faces && window.CUTIN) for (const k of Object.values(CUTIN_EXPR)) CUTIN.eyes(p.faces, k, p.cutin_eyes).catch(() => {});
+  for (const u of Object.values(p.cutins || {})) { const i = new Image(); i.src = u; }
+}
+function cutinFor(d) {
+  const scene = d.cutin;
+  if (!scene || !G.live || !CUTIN_ON || !window.CUTIN) return 0;
+  if (scene === "beat") {
+    if (performance.now() - lastBeatCutin < 6000) return 0;    // "大你" 太密就不切
+    lastBeatCutin = performance.now();
+  }
+  const s = G.seats[d.seat], p = prof(s.name);
+  let art = "", artKind = p.art === "bust" ? "bust" : "full";
+  const custom = (p.cutins || {})[scene];
+  if (custom) { art = custom; artKind = "scene"; }
+  else {
+    const r = p.avatar && ART.get(p.avatar);
+    art = r && r.ready && r.ready.full;
+  }
+  if (!art) return 0;                                           // 立绘还没处理好就不切，免得卡顿
+  const eyes = p.faces ? CUTIN.eyesNow(p.faces, CUTIN_EXPR[scene], p.cutin_eyes) : "";
+  const left = s.hand.length;
+  const title = { rocket: "王炸", bomb: "炸弹", alarm: "报警", beat: "大你" }[scene];
+  const sub = scene === "alarm" ? `${s.name} · 只剩 ${left} 张` : s.name;
+  return CUTIN.play({
+    tier: scene, side: $("seat" + d.seat).dataset.pos === "right" ? "right" : "left",
+    art, artKind, eyes, color: colorOf(s.name), title: title + (scene === "beat" ? "！" : ""), sub, sfx,
+  });
+}
+
+// 出牌特效：每种牌型对应一个动画；画面不震，只有炸弹爆炸时震一下
+// cut：大招特写的时长，炸弹/王炸的爆炸动画等特写放完再开始
+function fxPlay(d, cut = 0) {
+  if (!G.live) return;
+  const k = d.kind, el = playedCards(d.seat), p = playPos(d.seat), col = colorOf(G.seats[d.seat].name);
+  sfx("slap");
+  if (!el) return;
+  if (k === "rocket") return cut ? later(cut - 220, () => fxRocket(p, true)) : fxRocket(p);
+  if (k === "bomb") return cut ? later(cut - 220, () => fxBomb(p, true)) : fxBomb(p);
+  if (k.startsWith("plane")) return fxPlane(d, el);
+  if (k === "straight" || k === "pair_straight") return fxStraight(el, k);
+  if (k.startsWith("four")) {
+    COMBO.seal(el, k === "four_two_pair" ? "四带<br>两对" : "四带二", { sfx });
+    return;
+  }
+  if (k.startsWith("trio")) {
+    const cnt = rankCount(d.cards), trio = +Object.keys(cnt).find((r) => cnt[r] === 3);
+    const sorted = s_played(d.seat), idx = sorted.map((c, i) => (c.r === trio ? i : -1)).filter((i) => i >= 0);
+    const cards = [...el.querySelectorAll(".card")];
+    COMBO.rings(idx.map((i) => cards[i]).filter(Boolean), { sfx });
+    later(380 + 3 * 170, () => big(BIG_TEXT[k], "minor", 1100));
+    return;
+  }
+  const bigCard = d.cards.some((r) => r >= 15);
+  COMBO.glint(el, { big: bigCard });
+  FX.ring(p.x, p.y, { c: col, vr: 700, w: 5, life: 0.4 });
+  if (bigCard) later(300, () => sfx("big"));
+}
+function s_played(seat) { const s = G.seats[seat]; return Array.isArray(s.played) ? s.played.slice().sort(byAsc) : []; }
+
+function fxBomb(p, quiet) {
+  COMBO.bomb({ p, sfx, onBoom: (x, y) => {
+    if (!G.live) return;
+    FX.flash(`radial-gradient(circle at ${(x / 19.2).toFixed(1)}% ${(y / 10.8).toFixed(1)}%, #fff, rgba(255,150,40,.7) 30%, rgba(140,10,0,.35) 65%, transparent)`, 700);
+    FX.glow(x, y, { size: 760, c: "rgba(255,210,130,1)", life: 0.5 });
+    FX.glow(x, y, { size: 320, c: "rgba(255,255,255,1)", life: 0.25 });
+    [["#ffffff", 2200, 26, 0], ["#ffb020", 1600, 18, 80], ["#ff3d2d", 1100, 12, 160]].forEach(([c, vr, w, dl]) => setTimeout(() => FX.ring(x, y, { c, vr, w, life: 0.7, vd: 0.94 }), dl));
+    FX.burst(x, y, { n: 240, colors: FIRE, speed: [400, 1700], g: 700, len: [0.03, 0.07], w: [2, 5], life: [0.6, 1.3] });
+    FX.debris(x, y, { n: 36, colors: ["#2a2e40", "#4a5068", "#ff5a1f", "#ffd25a"] });
+    FX.smoke(x, y, { n: 22, c: "rgba(90,70,60,1)" });
+    FX.embers(x, y, { n: 80, r: 170, colors: FIRE });
+    FX.bgHit("hit-red", 1000);
+    FX.thump(1);                // 全场唯一一次震屏
+    if (!quiet) big("炸弹", "bomb", 1900);
+    sfx("bomb");
+    later(600, () => FX.embers(x, y, { n: 40, r: 240, colors: FIRE }));
+  } });
+}
+
+function fxRocket(p, quiet) {
+  COMBO.rocket({ p, sfx, onBoom: (x, y) => {
+    if (!G.live) return;
+    FX.flash("radial-gradient(circle at 40% 24%, #fff, rgba(255,200,80,.6) 30%, rgba(160,0,20,.3) 65%, transparent)", 800);
+    FX.glow(x, y, { size: 900, c: "rgba(255,240,200,1)", life: 0.55 });
+    FX.firework(x, y, FESTIVE, 1.6);
+    FX.burst(x, y, { n: 220, colors: FESTIVE.concat(RAINBOW), speed: [400, 1800], g: 420, len: [0.03, 0.07], w: [2, 4], life: [0.8, 1.6] });
+    ["#ffffff", "#ffd36b", "#ff5a3a"].forEach((c, i) => setTimeout(() => FX.ring(x, y, { c, vr: 2000 - i * 400, w: 18 - i * 4, life: 0.8, vd: 0.95 }), i * 100));
+    FX.rays(x, y, "rgba(255,211,107,.55)", 2200);
+    FX.bgHit("hit-rainbow", 1500);
+    const jk = document.createElement("div"); jk.className = "jokers sz-xl";
+    jk.innerHTML = cardHtml({ r: 16 }, 0) + cardHtml({ r: 17 }, 1);
+    fxAdd(jk, 2300);
+    if (!quiet) big("王炸", "rocket", 2300);
+    sfx("rocket");
+    for (let k = 0; k < 6; k++) {
+      later(350 + k * 230, () => {
+        const tx = FX.rnd(160, 1380), ty = FX.rnd(110, 380);
+        FX.shell(FX.rnd(250, 1250), 1000, tx, ty, FX.rnd(0.45, 0.65), ["#ffd36b", "#ff9a1f"], (a, b) => { if (G.live) { FX.firework(a, b, [FX.pick(FESTIVE), FX.pick(RAINBOW), "#ffffff"]); sfx("pop"); } }, { thick: 1, size: 4, fall: 40 });
+      });
+    }
+  } });
+}
+
+function fxPlane(d, el) {
+  COMBO.plane({ sfx, onMid: () => {
+    if (!G.live) return;
+    big("飞机", "plane", 1500);
+    [...el.querySelectorAll(".card")].forEach((c, i) => c.animate([{ transform: "none" }, { transform: "translateY(-22px) rotate(-4deg)" }, { transform: "none" }], { duration: 500, delay: i * 30, easing: "ease-out" }));
+    const r = COMBO.rectOf(el);
+    FX.glitter(r.x + r.w / 2, r.y, { n: 40, colors: ["#fff", "#bff6ff", "#ffd36b"], speed: [80, 360], g: 150 });
+  } });
+}
+
+function fxStraight(el, k) {
+  const pairs = k === "pair_straight";
+  const cols = pairs ? ["#ffb3e0", "#ff5fb5", "#d9b8ff", "#9b6bff"] : ["#fff3b0", "#ffc23a", "#3ee7ff", "#2a8cff"];
+  later(420, () => {
+    const total = COMBO.wave(el, { pairs, cols, sfx });
+    later(Math.min(total, 900), () => big(BIG_TEXT[k], k, 1400));
+  });
+}
+
+function fxBid(d) {
+  if (!G.live || !d.bid) return;
+  const p = seatPos(d.seat);
+  FX.ring(p.x, p.y, { c: "#ffd36b", vr: 500 + d.bid * 250, w: 4 + d.bid * 2, life: 0.5 });
+  if (d.bid === 3) {
+    FX.glitter(p.x, p.y, { n: 60, colors: GOLD, speed: [100, 500], g: 120 });
+    big(`${G.seats[d.seat].name} 叫三分`, "lord", 1400);
+  }
+}
+
+function fxLandlord(seat, name) {
+  if (!G.live) return;
+  const p = seatPos(seat);
+  sfx("lord");
+  FX.glow(p.x, p.y, { size: 420, c: "rgba(255,220,120,1)", life: 0.6 });
+  FX.ring(p.x, p.y, { c: "#ffd36b", vr: 1200, w: 10, life: 0.7 });
+  FX.glitter(p.x, p.y - 120, { n: 90, colors: GOLD, speed: [60, 420], g: 160, life: [1, 1.8] });
+  FX.rays(p.x, p.y, "rgba(255,211,107,.5)", 2400);
+  big(`${name} 成为地主`, "lord", 1800);
+}
+
+function fxAlarm(seat, left) {
+  if (!G.live) return;
+  const p = seatPos(seat), name = G.seats[seat].name;
+  toast(`${name} 报警！只剩 ${left} 张`);
+  FX.danger(true);
+  FX.ring(p.x, p.y, { c: "#ff2d4a", vr: 800, w: 8, life: 0.7 });
+  later(300, () => FX.ring(p.x, p.y, { c: "#ff2d4a", vr: 800, w: 8, life: 0.7 }));
+  later(200, () => sfx("siren"));
+}
+
+function matchLabel(m) {
+  if (!m) return "";
+  return m.round_name === "决赛" ? `决赛 第${m.game}/${m.of}局` : `${m.round_name} · ${LETTER[m.table]}桌 第${m.game}/${m.of}局`;
+}
+function fxStart(m) {
+  if (!G.live) return;
+  big(m ? matchLabel(m) : "开局", "start", 1300); sfx("start");
+  later(1050, () => {
+    big(m && m.round_name === "决赛" && m.game === m.of ? "冠军局" : "开战", "fight", 1200);
+    FX.ring(CENTER.x, CENTER.y, { c: "#3ee7ff", vr: 1600, w: 12 });
+    FX.glitter(CENTER.x, CENTER.y, { n: 80, colors: GOLD.concat("#ff2bd6"), speed: [150, 700], g: 200 });
+    sfx("fight");
+  });
+}
+
+// 背景里一直放的小烟花
+function ambient() {
+  setTimeout(ambient, 2600 + Math.random() * 3200);
+  if (!G.live || FX.LV < 2 || document.hidden) return;
+  const x0 = FX.rnd(80, 1450), tx = x0 + FX.rnd(-120, 120), ty = FX.rnd(60, 260);
+  FX.shell(x0, 440, tx, ty, FX.rnd(0.7, 1.0), ["#ffd36b", "#ff9a1f"], (x, y) => FX.firework(x, y, [FX.pick(FESTIVE), FX.pick(RAINBOW), "#fff"], 0.35), { thick: 1, size: 3, fall: 40 });
+}
+
+/* ================= 音效（WebAudio 合成，无需素材） ================= */
+const SFX = { on: localStorage.getItem("dd_sound") !== "off" };
+function actx() { return FX.ctx(); }
+function tone(f, dur, type = "sine", vol = 0.12, when = 0, to) {
+  const c = actx(); if (!c) return;
+  const t = c.currentTime + when, o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.setValueAtTime(f, t); if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(FX.sfxOut()); o.start(t); o.stop(t + dur + 0.02);
+}
+function noise(dur, vol, when = 0, lp = 1000, sweepTo = 0, type = "lowpass") {
+  const c = actx(); if (!c) return;
+  const t = c.currentTime + when, buf = c.createBuffer(1, Math.ceil(c.sampleRate * dur), c.sampleRate), d = buf.getChannelData(0);
+  for (let k = 0; k < d.length; k++) d[k] = (Math.random() * 2 - 1) * Math.pow(1 - k / d.length, 2);
+  const s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+  s.buffer = buf; f.type = type; f.frequency.setValueAtTime(lp, t); if (sweepTo) f.frequency.exponentialRampToValueAtTime(sweepTo, t + dur);
+  g.gain.value = vol;
+  s.connect(f).connect(g).connect(FX.sfxOut()); s.start(t);
+}
+const arp = (fs, step, dur, type = "triangle", vol = 0.1, at = 0) => fs.forEach((f, i) => tone(f, dur, type, vol, at + i * step));
+const SOUNDS = {
+  slap: () => { noise(0.09, 1.0, 0, 1800, 500, "bandpass"); noise(0.03, 0.6, 0, 5000, 0, "highpass"); tone(150, 0.09, "sine", 0.4, 0, 60); },
+  play: () => SOUNDS.slap(),
+  deal: () => { for (let k = 0; k < 17; k++) noise(0.03, 0.45, k * 0.034, 4200, 0, "highpass"); },
+  heavy: () => { SOUNDS.slap(); tone(220, 0.16, "square", 0.1, 0.02, 110); noise(0.14, 0.4, 0.02, 1600); },
+  big: () => { arp([880, 1320, 1760], 0.04, 0.12, "square", 0.06); noise(0.15, 0.3, 0, 2500); },
+  pass: () => { tone(200, 0.07, "sine", 0.16); tone(170, 0.07, "sine", 0.14, 0.12); },
+  bid: () => { tone(660, 0.1, "triangle", 0.12); tone(990, 0.14, "triangle", 0.1, 0.08); },
+  combo: () => arp([523, 659, 784, 1047, 1319], 0.05, 0.14, "square", 0.06),
+  swoosh: () => noise(0.45, 0.45, 0, 400, 6000, "bandpass"),
+  charge: () => tone(180, 0.2, "sawtooth", 0.14, 0, 1100),
+  boom: () => { noise(0.5, 0.6, 0, 900); tone(90, 0.4, "sine", 0.4, 0, 35); },
+  bomb: () => { noise(1.1, 1, 0, 1200, 120); tone(110, 0.8, "sawtooth", 0.35, 0, 28); tone(55, 1.1, "sine", 0.6, 0, 22); noise(0.6, 0.4, 0.15, 500); },
+  launch: () => { noise(0.5, 0.5, 0, 500, 7000, "bandpass"); tone(300, 0.5, "sawtooth", 0.1, 0, 2200); },
+  rocket: () => { noise(1.5, 1, 0, 2000, 100); tone(80, 1.2, "sawtooth", 0.4, 0, 25); tone(45, 1.5, "sine", 0.7, 0, 20); arp([784, 988, 1175, 1568, 1976], 0.07, 0.2, "square", 0.06, 0.15); },
+  pop: () => { noise(0.3, 0.6, 0, 2600); for (let k = 0; k < 6; k++) noise(0.03, 0.2, 0.1 + k * 0.045, 7000, 0, "highpass"); },
+  jet: () => { noise(0.9, 0.35, 0, 300, 3000, "bandpass"); noise(1.1, 0.45, 0.8, 3000, 250, "bandpass"); tone(320, 0.9, "sawtooth", 0.05, 0, 520); tone(520, 1.1, "sawtooth", 0.05, 0.8, 260); },
+  whistle: () => tone(1900, 0.42, "sine", 0.1, 0, 520),
+  thud: () => { tone(120, 0.18, "sine", 0.5, 0, 50); noise(0.12, 0.5, 0, 800); },
+  fuse: () => { noise(0.65, 0.35, 0, 6000, 3000, "highpass"); for (let k = 0; k < 10; k++) noise(0.02, 0.25, k * 0.06, 8000, 0, "highpass"); },
+  ignite: () => { noise(0.8, 0.5, 0, 260, 900); tone(60, 0.8, "sawtooth", 0.12, 0, 90); },
+  note: (k = 0) => { const sc = [523, 587, 659, 784, 880, 1047, 1175, 1319, 1568, 1760, 2093, 2349]; const f = sc[Math.min(k, sc.length - 1)]; tone(f, 0.22, "triangle", 0.11); tone(f * 2, 0.12, "sine", 0.04); },
+  chime: (k = 0) => { const f = [880, 1109, 1319][k % 3]; tone(f, 0.6, "sine", 0.14); tone(f * 2.76, 0.3, "sine", 0.04); tone(f * 5.4, 0.15, "sine", 0.02); },
+  stamp: () => { tone(90, 0.25, "sine", 0.6, 0, 45); noise(0.15, 0.7, 0, 900); tone(196, 1.4, "sine", 0.1, 0.05); tone(392, 1.0, "sine", 0.05, 0.05); },
+  thunder: () => { noise(1, 0.9, 0, 3000, 150); tone(70, 0.8, "sawtooth", 0.3, 0, 28); },
+  fight: () => { arp([392, 523, 659, 1047], 0.05, 0.3, "square", 0.08); noise(0.4, 0.5, 0, 1500); tone(60, 0.5, "sine", 0.5, 0, 30); },
+  siren: () => { for (let k = 0; k < 3; k++) { tone(880, 0.18, "square", 0.07, k * 0.36, 1320); tone(1320, 0.18, "square", 0.07, k * 0.36 + 0.18, 880); } },
+  lord: () => arp([392, 523, 659, 784, 1047], 0.08, 0.22, "triangle", 0.12),
+  win: () => arp([523, 659, 784, 1047, 1319, 1568], 0.1, 0.3, "triangle", 0.12),
+  out: () => { tone(420, 0.6, "sawtooth", 0.14, 0, 70); noise(0.5, 0.6, 0, 900, 100); tone(50, 0.6, "sine", 0.5, 0, 25); },
+  next: () => { arp([440, 554, 659, 880, 1109], 0.06, 0.16, "square", 0.06); noise(0.5, 0.3, 0, 500, 6000, "bandpass"); },
+  start: () => { arp([330, 440, 554], 0.1, 0.18, "triangle", 0.1); noise(0.8, 0.3, 0, 300, 5000, "bandpass"); },
+};
+function sfx(name, arg) { if (G.live && SFX.on && SOUNDS[name]) { try { SOUNDS[name](arg); } catch (e) { /* 忽略 */ } } }
+
+/* ================= 选手语音 =================
+ * 后端给每手牌一组片段 clips：[{text, url?, sim?, duration}]
+ *   有 url：播放真实接口合成的音频（HeyGen / 自定义接口）
+ *   sim：本地模拟，用浏览器自带中文语音念，按选手的 voice_sim 调音高、语速 */
+const VOICE = { on: localStorage.getItem("dd_voice") !== "off", q: [], cur: null, zh: [], tm: null };
+const TTS_OK = "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
+function loadVoices() { try { VOICE.zh = speechSynthesis.getVoices().filter((v) => /^(zh|cmn)/i.test(v.lang)); } catch (e) { VOICE.zh = []; } }
+if (TTS_OK) { loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
+function pickVoice(sim) {
+  if (!VOICE.zh.length) return null;
+  if (sim.voice) {
+    try { const re = new RegExp(sim.voice, "i"); const v = VOICE.zh.find((x) => re.test(x.name)); if (v) return v; } catch (e) { /* 正则写错就用默认 */ }
+  }
+  return VOICE.zh.find((x) => /zh-CN/i.test(x.lang)) || VOICE.zh[0];
+}
+function stopVoice() {
+  VOICE.q = []; const c = VOICE.cur; VOICE.cur = null; clearTimeout(VOICE.tm);
+  if (c && c.pause) c.pause();
+  if (TTS_OK) speechSynthesis.cancel();
+  l2dStopAll();
+}
+function speakClips(name, clips) {
+  if (!G.live || !VOICE.on || !clips || !clips.length) return;
+  stopVoice();   // 后端已经按语音时长控制节奏，新的一手来了就不再念旧的
+  VOICE.q = clips.map((c) => ({ ...c, name }));
+  nextClip();
+}
+function nextClip() {
+  clearTimeout(VOICE.tm);
+  const c = VOICE.q.shift();
+  if (!c) { VOICE.cur = null; FX.duck(false); return; }
+  FX.duck(true);
+  const done = (me) => () => { if (VOICE.cur === me) nextClip(); };
+  const lc = l2dCtrlByName(c.name);   // 这个角色是 Live2D 的话，跟着语音动嘴
+  if (c.url) {
+    const a = new Audio(c.url); VOICE.cur = a;
+    const fin = done(a), end = () => { if (lc) lc.stopSpeaking(); fin(); };
+    if (lc) lc.startSpeaking({ audio: a, text: c.text, duration: c.duration });
+    a.onended = a.onerror = end;
+    const p = a.play(); if (p && p.catch) p.catch(end);
+  } else if (c.sim && TTS_OK) {
+    const sim = prof(c.name).voice_sim || {};
+    const u = new SpeechSynthesisUtterance(c.text);
+    u.lang = "zh-CN"; const v = pickVoice(sim); if (v) u.voice = v;
+    u.pitch = clamp(+sim.pitch || 1, 0, 2); u.rate = clamp(+sim.rate || 1, 0.5, 2); u.volume = 1;
+    const fin = done(u), end = () => { if (lc) lc.stopSpeaking(); fin(); };
+    VOICE.cur = u; u.onend = u.onerror = end;
+    if (lc) lc.startSpeaking({ text: c.text, duration: c.duration || c.text.length * 0.25 });   // 语音合成拿不到音频数据，按文字估算口型
+    speechSynthesis.speak(u);
+    VOICE.tm = setTimeout(end, ((c.duration || 2) + 1.5) * 1000);   // 有的浏览器不触发 onend
+  } else nextClip();
+}
+
+function initSoundBtn() {
+  const b = $("sound"), m = $("bgm"), v = $("voice");
+  const paint = () => {
+    v.textContent = VOICE.on ? "语音 开" : "语音 关"; v.classList.toggle("off", !VOICE.on);
+    b.textContent = SFX.on ? "音效 开" : "音效 关"; b.classList.toggle("off", !SFX.on);
+    m.textContent = FX.BGM.on ? "音乐 开" : "音乐 关"; m.classList.toggle("off", !FX.BGM.on);
+  };
+  b.onclick = () => { SFX.on = !SFX.on; localStorage.setItem("dd_sound", SFX.on ? "on" : "off"); if (SFX.on) actx(); paint(); };
+  m.onclick = () => { FX.bgmToggle(); paint(); };
+  v.onclick = () => { VOICE.on = !VOICE.on; localStorage.setItem("dd_voice", VOICE.on ? "on" : "off"); if (!VOICE.on) stopVoice(); paint(); };
+  paint();
+}
+
+/* ================= 结算画面 ================= */
+async function showResult(d) {
+  const seq = ++G.endSeq;
+  const names = G.seats.map((s) => s.name);
+  const ov = $("overlay");
+  const lordWin = d.winner_side === "地主";
+  const m = d.match || {}, st = d.stats || {};
+  const isFinal = m.round_name === "决赛";
+  const tb = d.bracket && d.bracket.rounds[m.round] ? d.bracket.rounds[m.round].tables[m.table] : null;
+  const rank = (tb && tb.ranking) || [];
+  const cards = names.map((n, i) => {
+    const role = d.roles[i], win = role === d.winner_side;
+    const delta = d.deltas ? d.deltas[i] : (win ? 1 : -1) * d.multiplier * (role === "地主" ? 2 : 1);
+    const sc = st[n] ? st[n].score : 0;
+    return `<div class="rc${win ? " win" : ""}${role === "地主" ? " landlord" : ""}" data-n="${esc(n)}" style="--i:${i};${pcVars(n)}">
+      ${mini(n)}
+      <div class="nm">${esc(n)}</div>
+      <div class="rl"><span class="role ${role === "地主" ? "dz" : "nm"}"><span>${role}</span></span></div>
+      <div class="delta ${delta > 0 ? "pos" : "neg"}">${signed(delta)}</div>
+      <div class="tot">本轮积分 <b class="${sc < 0 ? "neg" : ""}">${signed(sc)}</b>${rank.length ? ` · 第${rank.indexOf(n) + 1}名` : ""}</div>
+      <div class="left">剩余 ${d.hands_left[i].length} 张</div>
+    </div>`;
+  }).join("");
+  const sub = [matchLabel(m), `倍数 <b>×${d.multiplier}</b>`];
+  if (d.bombs) sub.push(`炸弹 <b>${d.bombs}</b> 个`);
+  if (d.spring) sub.push(`<b>${lordWin ? "春天" : "反春"}</b>`);
+  ov.innerHTML = `<div class="res-title${lordWin ? "" : " farmer"}">${lordWin ? "地主胜利" : "农民胜利"}</div>
+    <div class="res-sub">${sub.join(" · ")}</div>
+    <div class="res-cards">${cards}</div>
+    <div class="res-reason"></div><div class="res-reason2"></div>`;
+  ov.classList.add("show");
+
+  const reason = ov.querySelector(".res-reason"), reason2 = ov.querySelector(".res-reason2");
+  const left = (m.of || 3) - (m.game || 0);
+  const stampAll = () => {
+    const marks = [];
+    (d.eliminated || []).forEach((n) => marks.push([n, "淘汰", "out"]));
+    (d.pending || []).forEach((n) => marks.push([n, "待定", "pend"]));
+    (d.advanced || []).forEach((n) => marks.push([n, isFinal ? "冠军" : "晋级", isFinal ? "champ" : "adv"]));
+    const po = d.playoff;
+    if (po) {   // 最后一桌打完：两桌第二比积分，本桌的待定直接出结果
+      for (const mk of marks) if (mk[2] === "pend") mk.splice(1, 2, po.advanced.includes(mk[0]) ? "晋级" : "淘汰", po.advanced.includes(mk[0]) ? "adv" : "out");
+    }
+    for (const [n, text, cls] of marks) {
+      const rc = ov.querySelector(`.rc[data-n="${CSS.escape(n)}"]`);
+      if (!rc) continue;
+      rc.classList.add("stamped", "s-" + cls);
+      rc.insertAdjacentHTML("beforeend", `<div class="stamp ${cls}">${text}</div>`);
+    }
+    const tag = isFinal ? "决赛" : `${LETTER[m.table]}桌`;
+    if (isFinal) reason.textContent = `决赛战罢：${(d.advanced || []).join("、")} 积分第一，夺得冠军！`;
+    else {
+      const parts = [`${tag}战罢：${(d.advanced || []).join("、")} 晋级`];
+      if ((d.pending || []).length && !po) parts.push(`${d.pending.join("、")} 待定（和另一桌的第二名比积分）`);
+      const outs = (d.eliminated || []);
+      if (outs.length) parts.push(`${outs.join("、")} 淘汰`);
+      reason.textContent = parts.join("，");
+    }
+    if (po) reason2.textContent = `第二名对比：${po.advanced.join("、")} 晋级，${po.eliminated.join("、")} 淘汰`;
+    return marks;
+  };
+  if (!d.table_done) {
+    reason.textContent = left > 0 ? `本桌还剩 ${left} 局 · ${isFinal ? "三局打完积分最高的夺冠" : "三局打完积分最低的淘汰"}` : "";
+  }
+  if (!G.live) { if (d.table_done) stampAll(); return; }
+
+  const winCols = lordWin ? GOLD : ["#cfe4ff", "#3ee7ff", "#ffffff", "#ff2bd6"];
+  sfx("win");
+  FX.flash("rgba(255,255,255,.35)", 400);
+  FX.confetti(0, 1080, { dir: -1.0, spread: 0.7, n: 140 });
+  FX.confetti(1920, 1080, { dir: -2.14, spread: 0.7, n: 140 });
+  for (let k = 0; k < 4; k++) later(150 + k * 260, () => { FX.firework(FX.rnd(300, 1620), FX.rnd(130, 380), winCols); sfx("pop"); });
+  if (d.spring) later(300, () => { big(lordWin ? "春天" : "反春", "spring", 2200); petals(90); });
+  if (!d.table_done) return;
+
+  await wait(1700); if (seq !== G.endSeq) return;
+  const marks = stampAll();
+  if (marks.some((x) => x[2] === "out")) sfx("out");
+  for (const [n, , cls] of marks) {
+    const rc = ov.querySelector(`.rc[data-n="${CSS.escape(n)}"]`);
+    if (!rc) continue;
+    const p = FX.at(rc);
+    const c = cls === "out" ? "#ff2d4a" : cls === "pend" ? "#fcee0a" : "#3ee7ff";
+    FX.ring(p.x, p.y, { c, vr: 1400, w: 14, life: 0.7 });
+    FX.burst(p.x, p.y, { n: 50, colors: [c, "#ffffff"], speed: [200, 700], g: 300 });
+  }
+  if (marks.some((x) => x[2] !== "out")) later(500, () => sfx("next"));
+}
+
+// 一轮打完：晋级名单
+function showRoundEnd(d) {
+  const b = d.bracket, rd = b && b.rounds[b.rounds.length - 1];
+  if (!rd) return;
+  const ov = $("overlay"), st = d.stats || {};
+  const adv = rd.advance || [], outs = rd.tables.flatMap((t) => t.out || []);
+  const title = rd.target === 3 ? "决赛圈诞生" : `${rd.target}强诞生`;
+  ov.innerHTML = `<div class="res-title">${title}</div>
+    <div class="res-sub">第 ${b.edition} 届 token争霸赛 · ${rd.name} 结束</div>
+    <div class="res-cards adv">${adv.map((n, i) => `<div class="rc win" style="--i:${i};${pcVars(n)}">${mini(n)}<div class="nm">${esc(n)}</div>
+      <div class="tot">本轮积分 <b class="${(st[n] || {}).score < 0 ? "neg" : ""}">${signed((st[n] || {}).score || 0)}</b></div><div class="stamp adv">晋级</div></div>`).join("")}</div>
+    <div class="res-outs">${outs.map((n) => `<span style="${pcVars(n)}">${mini(n)}${esc(n)}</span>`).join("")}<em>止步${rd.name}</em></div>`;
+  ov.classList.add("show");
+  if (!G.live) return;
+  sfx("next");
+  big(title, "lord", 1800);
+  FX.confetti(0, 1080, { dir: -1.0, n: 160 }); FX.confetti(1920, 1080, { dir: -2.14, n: 160 });
+}
+
+function showChampion(d) {
+  const ov = $("overlay"), name = (d.names || [])[0], b = d.bracket || {};
+  if (!name) return;
+  const p = prof(name), st = d.stats || {};
+  const final = (d.final || []).map((n, i) => `<div class="fr${i === 0 ? " first" : ""}" style="${pcVars(n)}"><i>${i + 1}</i>${mini(n)}<span>${esc(n)}</span><b>${signed((st[n] || {}).score || 0)}</b></div>`).join("");
+  ov.innerHTML = `<div class="champ" style="${pcVars(name)}">
+      <div class="champ-art">${p.avatar ? `<img data-art="${esc(p.avatar)}" data-name="${esc(name)}" alt="">` : mini(name)}</div>
+      <div class="champ-info">
+        <div class="champ-ed">第 ${b.edition || 1} 届 token争霸赛</div>
+        <div class="res-title">冠军</div>
+        <div class="champ-name">${esc(name)}</div>
+        <div class="champ-meta">${esc([p.title, p.model].filter(Boolean).join(" · "))}</div>
+        <div class="champ-final">${final}</div>
+        <div class="champ-next">下一届即将抽签</div>
+      </div>
+    </div>`;
+  ov.classList.add("show");
+  if (!G.live) return;
+  sfx("win");
+  for (let k = 0; k < 12; k++) later(k * 250, () => { FX.firework(FX.rnd(200, 1720), FX.rnd(120, 500), RAINBOW); sfx("pop"); });
+  FX.confetti(0, 1080, { dir: -1.0, n: 250 }); FX.confetti(1920, 1080, { dir: -2.14, n: 250 }); FX.rain({ n: 200 });
+}
+
+/* ================= 事件处理 ================= */
+function resyncHand(i, ranks) {
+  // 后端手牌和前端不一致时以后端为准
+  const s = G.seats[i];
+  if (s.hand.length === ranks.length) return;
+  const pool = s.hand.slice(); s.hand = [];
+  for (const r of ranks) { const k = pool.findIndex((c) => c.r === r); s.hand.push(k >= 0 ? pool.splice(k, 1)[0] : { r, s: Math.max(0, takeSuit(r)) }); }
+}
+function farmersOf(seat) { return [0, 1, 2].filter((i) => G.roles[i] === "农民" && i !== seat).map((i) => G.seats[i].name); }
+
+const H = {
+  synced() { G.live = true; FX.bgmStart(); },
+
+  game_start(d) {
+    G.endSeq++; $("overlay").classList.remove("show");
+    G.snap = d; G.profiles = d.profiles || G.profiles; G.gameNo = d.game_no; G.match = d.match || null;
+    G.bid = 0; G.mult = 1; G.landlord = -1; G.turn = -1; G.roles = [null, null, null];
+    d.table.forEach((n, i) => Object.assign(G.seats[i], { name: n, hand: [], played: null, thinking: false, alarmed: false }));
+    for (let i = 0; i < 3; i++) { buildSeat(i); renderPlayed(i); showClock(i, false); setExpr(i, 0, 0); cutinPrepare(G.seats[i].name); }
+    l2dRetain();
+    hideBubbles(); stopVoice(); setPhase("叫地主"); setHint("");
+    $("bottom").innerHTML = cardsHtml([{ back: 1 }, { back: 1 }, { back: 1 }], 3, "sz-xs");
+    renderBracket(d); renderAllSeats();
+    $("feed").innerHTML = "";
+    const m = G.match;
+    feed(null, `${m ? matchLabel(m) : `第 ${d.game_no} 局`}：${d.table.join(" / ")}`);
+    if (!m) ticker(`第 ${d.game_no} 局开战！`);
+    else if (m.round_name === "决赛") ticker(`决赛第 ${m.game}/${m.of} 局！三局积分最高的夺冠`);
+    else if (m.round_name === "6进3") ticker(`${matchLabel(m)} 开战！桌首晋级，第二待定，末位淘汰`);
+    else ticker(`${matchLabel(m)} 开战！三局打完积分最低的淘汰`);
+    FX.danger(false); fxStart(m);
+  },
+
+  round_start(d) {
+    renderBracket(d);
+    const b = d.bracket, rd = b && b.rounds[b.rounds.length - 1];
+    if (rd) feed(null, `第 ${b.edition} 届 · ${rd.name} 开始：${rd.tables.map((t, i) => `${rd.size <= 3 ? "决赛桌" : LETTER[i] + "桌"} ${t.players.join("/")}`).join("  ")}`);
+  },
+
+  round_end(d) {
+    renderBracket(d);
+    showRoundEnd(d);
+    const rd = d.bracket.rounds[d.bracket.rounds.length - 1];
+    ticker(`${rd.name} 结束！晋级：${rd.advance.join("、")}`, true);
+  },
+
+  deal(d) {
+    G.used = {};
+    d.hands.forEach((h, i) => { G.seats[i].hand = toCards(h); renderHand(i, true); });
+    renderAllSeats(); sfx("deal");
+  },
+
+  redeal(d) { toast(d.reason, "blue"); feed(null, d.reason); },
+
+  turn(d) {
+    const s = G.seats[d.seat];
+    G.turn = d.seat; s.thinking = true; s.t0 = performance.now();
+    setExpr(d.seat, "think", 0);
+    if (d.phase === "play") { s.played = null; renderPlayed(d.seat); }
+    bubble(d.seat, "", "");
+    for (let i = 0; i < 3; i++) showClock(i, i === d.seat);
+    setHint(d.phase === "bid" ? `${s.name} 正在考虑叫分…` : d.lead ? `${s.name} 首家出牌` : `轮到 ${s.name}`);
+    feedThinking(s.name, d.phase === "bid" ? "考虑叫分" : "思考中");
+    renderAllSeats();
+  },
+
+  bid(d) {
+    const s = G.seats[d.seat]; s.thinking = false; showClock(d.seat, false);
+    const { warn, text } = splitSay(d.say);
+    const what = d.bid ? `叫${d.call || d.bid + "分"}` : "不叫";
+    bubble(d.seat, `<b class="bid">${what}</b>`, text, warn);
+    feed(s.name, what, { say: text, pass: !d.bid });
+    if (d.bid) { G.bid = d.bid; setTop(); }
+    sfx(d.bid ? "bid" : "pass"); renderAllSeats(); fxBid(d);
+    setExpr(d.seat, d.bid === 3 ? "hype" : d.bid ? "happy" : "calm"); speakClips(s.name, d.clips);
+  },
+
+  landlord(d) {
+    G.landlord = d.seat; G.roles = d.roles; G.bid = d.bid; G.mult = d.bid; setTop();
+    G.bottom = toCards(d.bottom);
+    $("bottom").innerHTML = cardsHtml(G.bottom, 3, "sz-xs").replace(/class="card/g, `class="${G.live ? "flip " : ""}card`);
+    const s = G.seats[d.seat];
+    s.hand = s.hand.concat(G.bottom.map((c) => ({ ...c })));
+    for (let i = 0; i < 3; i++) { resyncHand(i, d.hands[i]); renderHand(i, false); }
+    hideBubbles(); setPhase("对局进行中"); setHint("");
+    renderAllSeats();
+    feed(null, `${s.name} 成为地主，底牌 ${fmtRanks(d.bottom)}`);
+    ticker(`${s.name} 抢到地主！${farmersOf(d.seat).join("、")} 联手能否掀翻？`, true);
+    fxLandlord(d.seat, s.name);
+    setExpr(d.seat, "laugh", 3000); others(d.seat).forEach((j) => setExpr(j, "angry", 2400));
+    l2dAct(d.seat, "nod");
+  },
+
+  play(d) {
+    const s = G.seats[d.seat]; s.thinking = false; showClock(d.seat, false);
+    if (d.cards.length) {
+      const out = [];
+      for (const r of d.cards) { const k = s.hand.findIndex((c) => c.r === r); out.push(k >= 0 ? s.hand.splice(k, 1)[0] : { r, s: Math.max(0, takeSuit(r)) }); }
+      s.played = out; s.label = d.type; s.kind = d.kind; s.hot = d.kind === "bomb" || d.kind === "rocket";
+    } else { s.played = "pass"; s.kind = "pass"; }
+    resyncHand(d.seat, d.hands[d.seat]);
+    renderHand(d.seat, false); renderPlayed(d.seat, true);
+
+    const { warn, text } = splitSay(d.say);
+    if (text) bubble(d.seat, "", text, warn);
+    if (d.cards.length) {
+      const act = d.kind === "rocket" ? "王炸!(双王)" : d.kind === "bomb" ? "炸弹!" : "出牌:";
+      feed(s.name, act, { chips: chipsHtml(s.played), say: text, hot: s.hot });
+      fxPlay(d, cutinFor(d));
+      if (d.kind === "rocket") ticker(`全场震撼！${s.name} 王炸！${G.roles[d.seat] === "地主" ? "农民" : "地主"}能否顶住？！`, true);
+      else if (d.kind === "bomb") ticker(`${s.name} 一个炸弹砸下来！倍数翻到 ×${d.multiplier}`, true);
+      else if (d.kind.startsWith("plane")) ticker(`${s.name} 飞机起飞！手牌一下少了一大截`);
+      else if (d.kind === "straight" || d.kind === "pair_straight") ticker(`${s.name} 打出${d.type}，节奏拉满`);
+    } else { feed(s.name, d.call || "不要", { say: text, pass: true }); sfx("pass"); }
+
+    speakClips(s.name, d.clips);
+    exprPlay(d);
+    if (d.multiplier) setMult(d.multiplier);
+    const left = s.hand.length;
+    if (left > 0 && left <= 2 && !s.alarmed) {
+      s.alarmed = true; fxAlarm(d.seat, left); if (!G.live) FX.danger(true);
+      ticker(`${s.name} 报警！只剩 ${left} 张牌！`, true);
+      setExpr(d.seat, "smug", 3000);
+      others(d.seat).forEach((j) => { if (G.roles[j] !== G.roles[d.seat]) setExpr(j, "shock", 2400); });
+    }
+    G.turn = -1; setHint("");
+    renderAllSeats();
+  },
+
+  new_round() {
+    for (let i = 0; i < 3; i++) { G.seats[i].played = null; renderPlayed(i); }
+  },
+
+  game_end(d) {
+    G.seats.forEach((s) => (s.thinking = false)); G.turn = -1; FX.danger(false);
+    for (let i = 0; i < 3; i++) showClock(i, false);
+    dropThinking();
+    const out = new Set(d.eliminated || []), up = new Set(d.advanced || []);
+    d.roles.forEach((r, i) => {
+      const n = G.seats[i].name;
+      setExpr(i, out.has(n) ? "sad" : up.has(n) ? "laugh" : r === d.winner_side ? "happy" : "angry", 0);
+      if (out.has(n)) l2dAct(i, "lowerHead");
+    });
+    d.hands_left.forEach((h, i) => { resyncHand(i, h); renderHand(i, false); });
+    G.snap = d; G.profiles = d.profiles || G.profiles;
+    renderAllSeats(); renderBracket(d); setPhase("结算"); setHint("");
+    const lead = (d.bracket && curTable(d.bracket) || {}).ranking || [];
+    if (d.table_done) {
+      feed(null, `${d.winner_side}胜利 · 晋级 ${(d.advanced || []).join("、") || "-"}${(d.eliminated || []).length ? ` · 淘汰 ${d.eliminated.join("、")}` : ""}`);
+      ticker(d.match && d.match.round_name === "决赛" ? `${(d.advanced || [])[0]} 夺得冠军！` : `本桌战罢！${(d.advanced || []).join("、")} 晋级${(d.eliminated || []).length ? `，${d.eliminated.join("、")} 淘汰` : ""}`, true);
+    } else {
+      feed(null, `${d.winner_side}胜利 · 本桌领先：${lead[0] || "-"}`);
+      ticker(`${d.winner_side}胜利！本桌暂列第一：${lead[0] || "-"}`, true);
+    }
+    showResult(d);
+  },
+
+  champion(d) { G.match = null; renderBracket(d); showChampion(d); ticker(`第 ${d.bracket.edition} 届 token争霸赛冠军：${d.names[0]}！`, true); },
+
+  demo_progress(d) {
+    let el = $("demoPill");
+    if (!el) {
+      el = document.createElement("div"); el.id = "demoPill"; el.className = "demo-pill";
+      $("controls").prepend(el);
+    }
+    el.innerHTML = `<label>演示 · 第 ${d.round} 轮</label><b>牌型 ${d.shown}/${d.total}</b>`;
+    el.title = d.missing.length ? "还没出：" + d.missing.join("、") : "全部牌型已展示";
+    el.classList.toggle("done", !!d.complete);
+    if (!d.type) return;
+    feed(null, `新牌型：${d.type}（${d.shown}/${d.total}）` + (d.complete ? " · 全部展示完毕" : ""));
+    if (d.complete) toast("14 种牌型全部展示完毕", "blue");
+  },
+};
+
+function handle(ev) {
+  const fn = H[ev.type];
+  if (!fn) return;
+  try { fn(ev.data || {}); } catch (e) { console.error("处理事件出错", ev.type, e); }
+}
+
+/* ================= 思考计时 ================= */
+setInterval(() => {
+  G.seats.forEach((s, i) => {
+    if (!s.thinking) return;
+    const sec = (performance.now() - s.t0) / 1000;
+    const c = $("clock" + i); c.querySelector("b").textContent = Math.floor(sec);
+    c.classList.toggle("slow", sec >= 15);
+    const t = $("thinkRow"); if (t && i === G.turn) t.querySelector(".tm").textContent = sec.toFixed(1) + "s";
+  });
+}, 100);
+
+/* ================= 缩放 / 连接 ================= */
+function fit() {
+  const k = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+  $("stage").style.transform = `scale(${k})`;
+}
+window.addEventListener("resize", fit);
+
+function connect() {
+  if (location.protocol === "file:") return;
+  const es = new EventSource("events");
+  es.onopen = () => { G.live = false; };   // 断线重连时先静默回放，收到 synced 再开特效
+  es.onmessage = (e) => { try { handle(JSON.parse(e.data)); } catch (err) { console.error(err); } };
+}
+
+if (Q.get("controls") === "1") document.body.classList.add("show-controls");
+FX.init(); buildScene();
+for (let i = 0; i < 3; i++) buildSeat(i);
+setTop(); ticker("等待开局…");
+fit(); initSoundBtn(); connect(); setTimeout(ambient, 1500);
+window.DD = { handle, G };
+})();

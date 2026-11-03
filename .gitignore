@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+config.local.json
+.env
+static/audio/
+audition/
+voices*.json
+# Live2D：官方示例模型（Free Material License，本地下载用）、素材准备输出、构建中间文件
+static/live2d/models/_samples/
+live2d/prep/
+live2d/build/
+build/
+live2d/.tsconfig.build.json

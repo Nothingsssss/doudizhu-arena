@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Live2D 调试</title>
+<style>
+  :root { --bg: #120a0c; --panel: #1d1215; --line: #3a2328; --gold: #f1c560; --text: #f3e6d6; --dim: #a68f80; --red: #ff5b5b; --ok: #6fe39a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.45 system-ui, "PingFang SC", "Microsoft YaHei", sans-serif; height: 100vh; display: grid; grid-template-columns: 1fr 380px; grid-template-rows: auto 1fr; }
+  header { grid-column: 1 / 3; display: flex; gap: 14px; align-items: center; padding: 8px 14px; border-bottom: 1px solid var(--line); background: #0d0709; flex-wrap: wrap; }
+  header b { color: var(--gold); font-size: 14px; }
+  .pill { padding: 2px 8px; border-radius: 10px; border: 1px solid var(--line); color: var(--dim); }
+  .pill.ok { color: var(--ok); border-color: #2e5a3e; }
+  .pill.bad { color: var(--red); border-color: #6a2a2a; }
+  #stage { position: relative; overflow: hidden; background: repeating-conic-gradient(#1a1114 0 25%, #150d10 0 50%) 0 0 / 28px 28px; display: grid; gap: 1px; }
+  .cell { position: relative; min-height: 0; outline: 1px solid transparent; }
+  .cell.cur { outline-color: var(--gold); }
+  .cell .tag { position: absolute; left: 8px; top: 6px; z-index: 2; color: var(--dim); font-size: 12px; pointer-events: none; }
+  .cell .state { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--dim); text-align: center; padding: 20px; pointer-events: none; }
+  .cell .state.err { color: var(--red); }
+  #empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--dim); }
+  aside { border-left: 1px solid var(--line); background: var(--panel); overflow: auto; padding: 10px 12px 40px; }
+  fieldset { border: 1px solid var(--line); border-radius: 6px; margin: 0 0 10px; padding: 8px 10px 10px; }
+  legend { color: var(--gold); padding: 0 4px; }
+  label { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  label > span { width: 58px; color: var(--dim); flex: none; }
+  input[type=range] { flex: 1; }
+  select, input[type=text], button { background: #2a1a1e; color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; font: inherit; }
+  button { cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--gold); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.on { border-color: var(--gold); color: var(--gold); }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 4px 0; }
+  .row input[type=text] { flex: 1; min-width: 0; }
+  output { width: 44px; text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; }
+  #pad { width: 160px; height: 160px; border: 1px solid var(--line); border-radius: 6px; position: relative; touch-action: none; background: radial-gradient(circle, #2a1a1e, #160d10); cursor: crosshair; }
+  #pad i { position: absolute; width: 14px; height: 14px; margin: -7px; border-radius: 50%; background: var(--gold); left: 50%; top: 50%; pointer-events: none; }
+  #params { max-height: 280px; overflow: auto; font: 11px ui-monospace, Menlo, Consolas, monospace; }
+  .plist div { display: grid; grid-template-columns: 1fr 96px 46px 16px; gap: 6px; align-items: center; padding: 1px 0; }
+  .plist span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .plist div.pin span { color: var(--gold); }
+  .plist input[type=range] { width: 96px; height: 12px; }
+  #parts { max-height: 200px; overflow: auto; font: 11px ui-monospace, Menlo, Consolas, monospace; }
+  #waveCfg { width: 100%; height: 150px; background: #2a1a1e; color: var(--text); border: 1px solid var(--line); border-radius: 4px; font: 11px ui-monospace, Menlo, Consolas, monospace; }
+  #log { max-height: 180px; overflow: auto; font: 11px ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; }
+  #log .error { color: var(--red); } #log .warn { color: #ffc46b; }
+  #perf { font: 12px ui-monospace, Menlo, Consolas, monospace; color: var(--dim); }
+  .res { color: var(--dim); min-height: 1.4em; }
+  .res.bad { color: var(--red); }
+</style>
+</head>
+<body>
+<header>
+  <b>Live2D 调试</b>
+  <span class="pill" id="sWebgl">WebGL …</span>
+  <span class="pill" id="sCore">Cubism Core …</span>
+  <span class="pill" id="sFw">Framework …</span>
+  <span class="pill" id="sAudio">音频 未解锁</span>
+</header>
+<main id="stage"><div id="empty">选择一个模型并加载</div></main>
+<aside>
+  <fieldset>
+    <legend>模型</legend>
+    <div class="row"><select id="mSel" style="flex:1"></select></div>
+    <div class="row"><input type="text" id="mUrl" placeholder="或输入 .model3.json 路径"></div>
+    <div class="row">
+      <button id="bLoad">加载到新格子</button>
+      <button id="bReplace">替换当前</button>
+      <button id="bUnload">卸载当前</button>
+      <button id="bHide">隐藏</button>
+    </div>
+    <div class="res" id="mRes"></div>
+  </fieldset>
+  <fieldset>
+    <legend>位置和缩放</legend>
+    <label><span>水平</span><input type="range" id="tx" min="-1.5" max="1.5" step="0.01" value="0"><output></output></label>
+    <label><span>垂直</span><input type="range" id="ty" min="-1.5" max="1.5" step="0.01" value="0"><output></output></label>
+    <label><span>缩放</span><input type="range" id="ts" min="0.2" max="4" step="0.01" value="1"><output></output></label>
+  </fieldset>
+  <fieldset>
+    <legend>头部和视线</legend>
+    <div class="row" style="align-items:flex-start;gap:12px">
+      <div id="pad" title="拖动控制头部方向"><i></i></div>
+      <div style="flex:1">
+        <label><span>侧倾 Z</span><input type="range" id="hz" min="-30" max="30" step="1" value="0"><output></output></label>
+        <label style="margin-top:8px"><input type="checkbox" id="follow"> 视线跟随鼠标</label>
+        <div class="res">拖动方块控制 ParamAngleX/Y，松开后恢复自动</div>
+      </div>
+    </div>
+  </fieldset>
+  <fieldset>
+    <legend>眼睛和嘴巴</legend>
+    <label><span>眼睛</span><input type="range" id="eye" min="0" max="1" step="0.01" value="1" disabled><output></output></label>
+    <label><input type="checkbox" id="eyeAuto" checked> 自动眨眼</label>
+    <label><span>嘴巴</span><input type="range" id="mouth" min="0" max="1" step="0.01" value="0" disabled><output></output></label>
+    <label><input type="checkbox" id="mouthAuto" checked> 口型同步</label>
+  </fieldset>
+  <fieldset>
+    <legend>情绪 / 表情</legend>
+    <div class="row" id="emos"></div>
+    <div class="row" id="exps"></div>
+    <div class="res" id="eRes"></div>
+  </fieldset>
+  <fieldset>
+    <legend>动作</legend>
+    <div class="row" id="acts"></div>
+    <div class="row" id="mots"></div>
+    <div class="row">
+      <label style="margin:0"><input type="checkbox" id="idle" checked> 待机</label>
+      <label style="margin:0"><input type="checkbox" id="phys" checked> 物理</label>
+    </div>
+    <div class="res" id="aRes"></div>
+  </fieldset>
+  <fieldset>
+    <legend>音频口型</legend>
+    <div class="row">
+      <button id="bTone">播放内置测试音</button>
+      <button id="bEst">文字估算</button>
+      <button id="bStop">停止</button>
+    </div>
+    <div class="row"><input type="file" id="aFile" accept="audio/*"></div>
+    <div class="row"><input type="text" id="aUrl" placeholder="音频地址（同源）"><button id="bUrl">播放</button></div>
+    <div class="res" id="sRes"></div>
+  </fieldset>
+  <fieldset>
+    <legend>性能</legend>
+    <div id="perf">—</div>
+  </fieldset>
+  <fieldset>
+    <legend>参数 <small id="pCount" style="color:var(--dim)"></small></legend>
+    <div class="row"><input type="text" id="pFilter" placeholder="筛选，例如 Arm"><button id="pFree">全部释放</button></div>
+    <div id="params" class="plist"></div>
+    <div class="res">拖动滑块会固定这个参数（覆盖动作和动画），取消勾选释放</div>
+  </fieldset>
+  <fieldset>
+    <legend>部件 <small id="ptCount" style="color:var(--dim)"></small></legend>
+    <div id="parts" class="plist"></div>
+    <div class="res">标 P 的由 pose3.json 切换（例如手臂 A/B）</div>
+  </fieldset>
+  <fieldset>
+    <legend>挥手调参</legend>
+    <textarea id="waveCfg" spellcheck="false"></textarea>
+    <div class="row"><button id="wApply">应用并试挥手</button><button id="wCopy">复制配置</button></div>
+    <div class="res" id="wRes"></div>
+  </fieldset>
+  <fieldset>
+    <legend>能力</legend>
+    <div id="caps" style="font:11px ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;color:var(--dim)"></div>
+  </fieldset>
+  <fieldset>
+    <legend>日志 / 错误</legend>
+    <div id="log"></div>
+  </fieldset>
+</aside>
+<script src="live2d/live2d.js"></script>
+<script src="live2d-debug.js"></script>
+</body>
+</html>

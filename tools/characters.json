@@ -1,0 +1,522 @@
+{
+  "_说明": "22 个二创形象（形象和模型对应图 C01~C20，加上 C21 小米 MiMo、C22 阶跃星辰）想要的声音。player 和 config.json 里选手的 name 一致；tags 用来在音色列表里打分匹配；line 是试听台词。",
+  "characters": [
+    {
+      "id": "claude",
+      "code": "C01",
+      "player": "Claude",
+      "image": "棕发抱书少女",
+      "voice": "知性、温柔、沉稳",
+      "gender": "female",
+      "tags": [
+        "calm",
+        "smart",
+        "clear",
+        "gentle",
+        "soft",
+        "warm",
+        "steady",
+        "知性",
+        "温柔",
+        "沉稳"
+      ],
+      "avoid": [
+        "old",
+        "deep",
+        "child"
+      ],
+      "line": "这一手，我先翻翻书……嗯，就出它吧。"
+    },
+    {
+      "id": "deepseek",
+      "code": "C02",
+      "player": "DeepSeek",
+      "image": "鲸鱼女仆",
+      "voice": "元气、开朗、少女",
+      "gender": "female",
+      "tags": [
+        "energetic",
+        "cheerful",
+        "bright",
+        "young",
+        "girl",
+        "cute",
+        "元气",
+        "开朗",
+        "少女"
+      ],
+      "avoid": [
+        "old",
+        "deep",
+        "mature"
+      ],
+      "line": "嘿嘿，鲸鱼女仆出击，炸弹拿去！"
+    },
+    {
+      "id": "kimi",
+      "code": "C03",
+      "player": "Kimi",
+      "image": "银发藏青礼服",
+      "voice": "优雅、成熟、从容",
+      "gender": "female",
+      "tags": [
+        "elegant",
+        "graceful",
+        "mature",
+        "confident",
+        "smooth",
+        "优雅",
+        "成熟",
+        "从容"
+      ],
+      "avoid": [
+        "child",
+        "cute"
+      ],
+      "line": "这点程度的牌，还不足以让我认真。"
+    },
+    {
+      "id": "qwen",
+      "code": "C04",
+      "player": "通义千问",
+      "image": "蓝紫长裙",
+      "voice": "温婉、知性、语速偏慢",
+      "gender": "female",
+      "tags": [
+        "gentle",
+        "soft",
+        "calm",
+        "smart",
+        "clear",
+        "温婉",
+        "知性",
+        "语速偏慢"
+      ],
+      "avoid": [
+        "old",
+        "deep",
+        "child"
+      ],
+      "line": "且慢，待我细细算来。"
+    },
+    {
+      "id": "glm",
+      "code": "C05",
+      "player": "GLM",
+      "image": "黑发尖帽",
+      "voice": "清冷、安静、神秘",
+      "gender": "female",
+      "tags": [
+        "cool",
+        "quiet",
+        "soft",
+        "mysterious",
+        "whisper",
+        "清冷",
+        "安静",
+        "神秘"
+      ],
+      "avoid": [
+        "old",
+        "deep",
+        "child"
+      ],
+      "line": "……书上说，这时候该出小牌。"
+    },
+    {
+      "id": "gemini",
+      "code": "C06",
+      "player": "Gemini",
+      "image": "紫发双马尾",
+      "voice": "俏皮、可爱、活泼",
+      "gender": "female",
+      "tags": [
+        "playful",
+        "cute",
+        "lively",
+        "energetic",
+        "俏皮",
+        "可爱",
+        "活泼"
+      ],
+      "avoid": [
+        "old",
+        "deep",
+        "mature"
+      ],
+      "line": "双子星闪亮登场，接招吧！"
+    },
+    {
+      "id": "perplexity",
+      "code": "C07",
+      "player": "Perplexity",
+      "image": "墨绿法师",
+      "voice": "冷静、理性、低沉",
+      "gender": "female",
+      "tags": [
+        "calm",
+        "cool",
+        "clear",
+        "serious",
+        "deep",
+        "low",
+        "冷静",
+        "理性",
+        "低沉"
+      ],
+      "avoid": [
+        "child",
+        "cute"
+      ],
+      "line": "我已经检索过了，这手你们接不住。"
+    },
+    {
+      "id": "mistral",
+      "code": "C08",
+      "player": "Mistral",
+      "image": "法棍红帽",
+      "voice": "热情、开朗、元气",
+      "gender": "female",
+      "tags": [
+        "warm",
+        "energetic",
+        "bright",
+        "cheerful",
+        "热情",
+        "开朗",
+        "元气"
+      ],
+      "avoid": [
+        "old",
+        "deep",
+        "child"
+      ],
+      "line": "法棍一挥，全场起立！"
+    },
+    {
+      "id": "grok",
+      "code": "C09",
+      "player": "Grok",
+      "image": "金发持斧",
+      "voice": "嚣张、直爽、带点坏",
+      "gender": "female",
+      "tags": [
+        "confident",
+        "bold",
+        "crisp",
+        "playful",
+        "嚣张",
+        "直爽",
+        "带点坏"
+      ],
+      "avoid": [
+        "old",
+        "deep",
+        "child"
+      ],
+      "line": "哈，就这？我炸了。"
+    },
+    {
+      "id": "meta",
+      "code": "C10",
+      "player": "Meta",
+      "image": "白发狐耳",
+      "voice": "软萌、慵懒、温柔",
+      "gender": "female",
+      "tags": [
+        "cute",
+        "soft",
+        "relaxed",
+        "gentle",
+        "warm",
+        "软萌",
+        "慵懒",
+        "温柔"
+      ],
+      "avoid": [
+        "old",
+        "deep",
+        "mature"
+      ],
+      "line": "唔……轮到我了吗，那就这个吧。"
+    },
+    {
+      "id": "seed",
+      "code": "C11",
+      "player": "豆包",
+      "image": "抱娃双马尾",
+      "voice": "甜美、亲切、可爱",
+      "gender": "female",
+      "tags": [
+        "sweet",
+        "friendly",
+        "warm",
+        "cute",
+        "甜美",
+        "亲切",
+        "可爱"
+      ],
+      "avoid": [
+        "old",
+        "deep",
+        "mature"
+      ],
+      "line": "大家好呀，打牌也要开开心心哦！"
+    },
+    {
+      "id": "wenxin",
+      "code": "C12",
+      "player": "文心一言",
+      "image": "书堆轮椅",
+      "voice": "博学、文静、温和",
+      "gender": "female",
+      "tags": [
+        "smart",
+        "calm",
+        "quiet",
+        "gentle",
+        "warm",
+        "博学",
+        "文静",
+        "温和"
+      ],
+      "avoid": [
+        "old",
+        "deep",
+        "child"
+      ],
+      "line": "此局胜负，已在书中。"
+    },
+    {
+      "id": "github",
+      "code": "C13",
+      "player": "GitHub",
+      "image": "黑猫触手",
+      "voice": "古灵精怪、调皮",
+      "gender": "female",
+      "tags": [
+        "playful",
+        "cute",
+        "古灵精怪",
+        "调皮"
+      ],
+      "avoid": [
+        "old",
+        "deep",
+        "child"
+      ],
+      "line": "提交！合并！这手牌没有冲突。"
+    },
+    {
+      "id": "gitlab",
+      "code": "C14",
+      "player": "GitLab",
+      "image": "橙狐长裙",
+      "voice": "干练、自信、清亮",
+      "gender": "female",
+      "tags": [
+        "crisp",
+        "confident",
+        "clear",
+        "bright",
+        "干练",
+        "自信",
+        "清亮"
+      ],
+      "avoid": [
+        "old",
+        "deep",
+        "child"
+      ],
+      "line": "流水线全绿，出牌！"
+    },
+    {
+      "id": "gitee",
+      "code": "C15",
+      "player": "Gitee",
+      "image": "红衣小恶魔",
+      "voice": "傲娇、俏皮",
+      "gender": "female",
+      "tags": [
+        "playful",
+        "cute",
+        "傲娇",
+        "俏皮"
+      ],
+      "avoid": [
+        "old",
+        "deep",
+        "child"
+      ],
+      "line": "哼，本小姐出手，你们就认输吧。"
+    },
+    {
+      "id": "hunyuan",
+      "code": "C16",
+      "player": "腾讯混元",
+      "image": "黑发红围巾",
+      "voice": "冷静、干练、侠气",
+      "gender": "female",
+      "tags": [
+        "calm",
+        "cool",
+        "crisp",
+        "confident",
+        "strong",
+        "冷静",
+        "干练",
+        "侠气"
+      ],
+      "avoid": [
+        "old",
+        "deep",
+        "child"
+      ],
+      "line": "出手便不回头。这一手，我压了。"
+    },
+    {
+      "id": "rwkv",
+      "code": "C17",
+      "player": "RWKV",
+      "image": "乌鸦羽翼",
+      "voice": "低沉、神秘、冷艳",
+      "gender": "female",
+      "tags": [
+        "deep",
+        "low",
+        "mysterious",
+        "whisper",
+        "cool",
+        "mature",
+        "低沉",
+        "神秘",
+        "冷艳"
+      ],
+      "avoid": [
+        "child",
+        "cute"
+      ],
+      "line": "夜色降临，这局归我。"
+    },
+    {
+      "id": "hailuo",
+      "code": "C18",
+      "player": "海螺",
+      "image": "橙发信使",
+      "voice": "活泼、阳光、少女",
+      "gender": "female",
+      "tags": [
+        "lively",
+        "energetic",
+        "bright",
+        "cheerful",
+        "young",
+        "girl",
+        "cute",
+        "活泼",
+        "阳光",
+        "少女"
+      ],
+      "avoid": [
+        "old",
+        "deep",
+        "mature"
+      ],
+      "line": "快递到！这手牌请签收～"
+    },
+    {
+      "id": "opencode",
+      "code": "C19",
+      "player": "OpenCode",
+      "image": "黑角少女",
+      "voice": "酷、冷淡、简洁",
+      "gender": "female",
+      "tags": [
+        "cool",
+        "calm",
+        "crisp",
+        "clear",
+        "酷",
+        "冷淡",
+        "简洁"
+      ],
+      "avoid": [
+        "old",
+        "deep",
+        "child"
+      ],
+      "line": "代码跑通了，出牌。"
+    },
+    {
+      "id": "gpt",
+      "code": "C20",
+      "player": "GPT",
+      "image": "白发龙娘",
+      "voice": "高贵、温柔、从容",
+      "gender": "female",
+      "tags": [
+        "elegant",
+        "mature",
+        "gentle",
+        "soft",
+        "warm",
+        "confident",
+        "smooth",
+        "高贵",
+        "温柔",
+        "从容"
+      ],
+      "avoid": [
+        "child",
+        "cute"
+      ],
+      "line": "龙之吐息——王炸！"
+    },
+    {
+      "id": "mimo",
+      "code": "C21",
+      "player": "小米 MiMo",
+      "image": "白发橙领带少女",
+      "voice": "活泼、俏皮、少女",
+      "gender": "female",
+      "tags": [
+        "energetic",
+        "cheerful",
+        "young",
+        "girl",
+        "cute",
+        "活泼",
+        "俏皮",
+        "少女"
+      ],
+      "avoid": [
+        "old",
+        "deep",
+        "mature"
+      ],
+      "line": "嘿嘿，这把我算好了，炸弹留着压你！"
+    },
+    {
+      "id": "stepfun",
+      "code": "C22",
+      "player": "阶跃星辰",
+      "image": "橙色机器人",
+      "voice": "机械感、憨厚、少年",
+      "gender": "male",
+      "tags": [
+        "robot",
+        "young",
+        "friendly",
+        "calm",
+        "机器人",
+        "憨厚",
+        "少年"
+      ],
+      "avoid": [
+        "old",
+        "female"
+      ],
+      "line": "计算完毕，一步一步来，这手我要了。"
+    }
+  ]
+}

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>token争霸赛</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="cyber.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <linearGradient id="gGold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6c8"/><stop offset=".45" stop-color="#ffd25a"/><stop offset=".7" stop-color="#e09a1e"/><stop offset="1" stop-color="#8a4a08"/></linearGradient>
+    <linearGradient id="gGoldH" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8a4a08"/><stop offset=".3" stop-color="#ffd25a"/><stop offset=".5" stop-color="#fff6c8"/><stop offset=".7" stop-color="#ffd25a"/><stop offset="1" stop-color="#8a4a08"/></linearGradient>
+  </defs>
+  <symbol id="su0" viewBox="0 0 100 100"><path d="M50 5C35 25 8 40 8 60c0 14 11 22 22 22 8 0 14-4 17-9-1 9-5 17-12 22h30c-7-5-11-13-12-22 3 5 9 9 17 9 11 0 22-8 22-22C92 40 65 25 50 5Z"/></symbol>
+  <symbol id="su1" viewBox="0 0 100 100"><path d="M50 90C20 66 5 51 5 31 5 16 17 6 30 6c10 0 17 6 20 13 3-7 10-13 20-13 13 0 25 10 25 25 0 20-15 35-45 59Z"/></symbol>
+  <symbol id="su2" viewBox="0 0 100 100"><circle cx="50" cy="27" r="20"/><circle cx="27" cy="58" r="20"/><circle cx="73" cy="58" r="20"/><path d="M45 50h10c0 22 4 33 13 45H32c9-12 13-23 13-45Z"/></symbol>
+  <symbol id="su3" viewBox="0 0 100 100"><path d="M50 3 90 50 50 97 10 50Z"/></symbol>
+  <symbol id="star" viewBox="0 0 100 100"><path d="M50 4 62 37h35L69 58l11 34-30-21-30 21 11-34L3 37h35Z"/></symbol>
+  <!-- 小丑（大小王） -->
+  <symbol id="jester" viewBox="0 0 100 120">
+    <path d="M50 46 C40 30 22 14 6 18 C20 26 26 38 30 52 Z" fill="#e8283c"/>
+    <path d="M50 46 C46 26 50 8 50 2 C54 8 58 26 54 46 Z" fill="#ffc21a"/>
+    <path d="M50 46 C60 30 78 14 94 18 C80 26 74 38 70 52 Z" fill="#1fae5b"/>
+    <circle cx="6" cy="18" r="5" fill="#ffd23f" stroke="#a86a00" stroke-width="1.5"/>
+    <circle cx="50" cy="3" r="5" fill="#ffd23f" stroke="#a86a00" stroke-width="1.5"/>
+    <circle cx="94" cy="18" r="5" fill="#ffd23f" stroke="#a86a00" stroke-width="1.5"/>
+    <path d="M26 50 Q50 40 74 50 L72 56 Q50 48 28 56 Z" fill="#7a2bd6"/>
+    <ellipse cx="50" cy="72" rx="22" ry="22" fill="#ffe2c4" stroke="#7a3a10" stroke-width="2"/>
+    <path d="M38 66 q4 -5 8 0 M54 66 q4 -5 8 0" stroke="#2a1606" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <circle cx="36" cy="77" r="4" fill="#ff7b8f" opacity=".7"/><circle cx="64" cy="77" r="4" fill="#ff7b8f" opacity=".7"/>
+    <path d="M38 80 Q50 94 62 80 Q50 86 38 80 Z" fill="#c4122c" stroke="#5a0410" stroke-width="1.5"/>
+    <circle cx="50" cy="73" r="3.5" fill="#e8283c"/>
+    <path d="M22 96 L30 92 L36 100 L43 93 L50 101 L57 93 L64 100 L70 92 L78 96 L74 108 Q50 118 26 108 Z" fill="#fff" stroke="#9aa3b5" stroke-width="1.5"/>
+  </symbol>
+</svg>
+
+<div id="viewport">
+<div id="stage">
+<div id="cam">
+  <!-- 背景：赛博城市夜景 + 透视网格地面 + 扫描线 -->
+  <div id="bg">
+    <svg id="scene" viewBox="0 0 1920 1080" preserveAspectRatio="none"></svg>
+    <div id="floor"><i></i></div>
+    <div id="embers"></div>
+    <div class="pulse"></div>
+  </div>
+
+  <!-- 牌桌 -->
+  <main id="table">
+    <div class="felt">
+      <div class="rim"></div>
+      <div class="cloth"><svg id="tableArt" viewBox="0 0 1490 700"></svg></div>
+      <div class="marquee"></div>
+    </div>
+    <div id="turnHint"></div>
+
+    <section class="seat" id="seat0" data-pos="left"></section>
+    <section class="seat" id="seat1" data-pos="right"></section>
+    <section class="seat" id="seat2" data-pos="bottom"></section>
+
+    <div class="played" id="played0"></div>
+    <div class="played" id="played1"></div>
+    <div class="played" id="played2"></div>
+
+    <div class="clock" id="clock0"><b>0</b></div>
+    <div class="clock" id="clock1"><b>0</b></div>
+    <div class="clock" id="clock2"><b>0</b></div>
+
+    <div class="bubble" id="bubble0"></div>
+    <div class="bubble" id="bubble1"></div>
+    <div class="bubble" id="bubble2"></div>
+  </main>
+
+  <!-- 顶部标题栏 -->
+  <header id="plaque">
+    <div class="hud-title"><span class="glitch" data-t="TOKEN争霸赛">TOKEN争霸赛</span></div>
+    <div class="hud-sub"><i></i><span id="hudEdition">第 1 届</span><i></i><span id="hudRound">等待抽签</span><i></i></div>
+    <div class="prow">
+      <div class="pchip"><span id="roundTag">第</span><b id="gameNo">-</b><span id="gameOf">局</span></div>
+      <div class="pbottom"><label>底牌</label><div id="bottom"></div></div>
+      <div class="pchip mult"><span>倍数</span><b id="mult">×1</b></div>
+    </div>
+  </header>
+
+  <div id="controls">
+    <span id="phase">等待开局</span>
+    <button id="voice" class="tbtn" title="选手语音开关">语音</button>
+    <button id="bgm" class="tbtn" title="背景音乐开关">音乐</button>
+    <button id="sound" class="tbtn" title="音效开关">音效</button>
+  </div>
+
+  <!-- 右侧面板：赛程流程图 + 实时战况 -->
+  <aside id="side">
+    <div class="panel p-bracket">
+      <h3><span>赛程</span><small id="bracketStage">9进6 · 6进3 · 决赛</small></h3>
+      <div id="bracket"></div>
+    </div>
+    <div class="panel p-feed">
+      <h3><span>实时战况</span><span class="onair"><i></i>LIVE</span></h3>
+      <div id="feedHead"></div>
+      <div id="feed"></div>
+      <div id="ticker"><i>▶</i><span></span></div>
+    </div>
+  </aside>
+
+  <div id="vig"></div>
+  <div id="overlay"></div>
+  <canvas id="fxc" width="1920" height="1080"></canvas>
+  <div id="cutin"></div>
+  <div id="fx"></div>
+</div>
+</div>
+</div>
+<script src="fx.js"></script>
+<script src="combo.js"></script>
+<script src="cutin.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

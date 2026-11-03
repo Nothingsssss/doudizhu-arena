@@ -1,0 +1,434 @@
+{
+  "port": 8000,
+  "arena": {
+    "format": "tournament",
+    "entrants": 9,
+    "games_per_table": 3,
+    "demo": true,
+    "move_delay": 1.2,
+    "game_pause": 8,
+    "round_pause": 12,
+    "champion_pause": 30,
+    "only_with_art": true,
+    "max_games": null
+  },
+  "players": [
+    {
+      "code": "C01",
+      "id": "claude",
+      "name": "Claude",
+      "title": "棕发抱书少女",
+      "color": "#d9773a",
+      "type": "llm",
+      "base_url": "https://api.anthropic.com/v1",
+      "model": "claude-sonnet-4-5",
+      "api_key_env": "ANTHROPIC_API_KEY",
+      "extra_body": {
+        "max_tokens": 512
+      },
+      "voice_id": "",
+      "voice_sim": {
+        "pitch": 1.15,
+        "rate": 0.95,
+        "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
+      }
+    },
+    {
+      "code": "C02",
+      "id": "deepseek",
+      "name": "DeepSeek",
+      "title": "鲸鱼女仆",
+      "color": "#4f6bff",
+      "type": "llm",
+      "base_url": "https://api.deepseek.com/v1",
+      "model": "deepseek-v4.1-flash-1017",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "voice_id": "976a1fdb2e944e639dd9a140eb18dc25",
+      "voice_sim": {
+        "pitch": 1.5,
+        "rate": 1.15,
+        "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
+      },
+      "cutin_eyes": [
+        0.4,
+        0.64
+      ],
+      "voice_name": "Mengyao - Punchy & Upbeat"
+    },
+    {
+      "code": "C23",
+      "id": "deepseek-v4pro",
+      "name": "DeepSeek V4 Pro",
+      "title": "深海女仆长",
+      "color": "#2f6bff",
+      "type": "llm",
+      "base_url": "https://api.deepseek.com/v1",
+      "model": "deepseek-v4-pro-0813",
+      "api_key_env": "DEEPSEEK_API_KEY",
+      "voice_id": "53f8d7dbf7f14a59aa2db2f8aa1725d3",
+      "voice_sim": {
+        "pitch": 1.35,
+        "rate": 1.05,
+        "voice": "Xiaoxiao|Xiaoyi|Huihui|Tingting|Female"
+      },
+      "art": "bust",
+      "voice_name": "Lea outside walking"
+    },
+    {
+      "code": "C03",
+      "id": "kimi",
+      "name": "Kimi",
+      "title": "银发藏青礼服",
+      "color": "#7d8cc4",
+      "type": "llm",
+      "base_url": "https://api.moonshot.cn/v1",
+      "model": "kimi-k3",
+      "api_key_env": "MOONSHOT_API_KEY",
+      "voice_id": "1c651b8254304a298f6f35585f2e1d04",
+      "voice_sim": {
+        "pitch": 1.0,
+        "rate": 0.95,
+        "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
+      },
+      "voice_name": "Ceecee - Soothing"
+    },
+    {
+      "code": "C04",
+      "id": "qwen",
+      "name": "通义千问",
+      "title": "蓝紫长裙",
+      "color": "#6a5cff",
+      "type": "llm",
+      "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "model": "qwen3.8-flash",
+      "api_key_env": "DASHSCOPE_API_KEY",
+      "voice_id": "1803df59c37443789d2e4f71c82859a0",
+      "voice_sim": {
+        "pitch": 1.1,
+        "rate": 0.9,
+        "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
+      },
+      "voice_name": "Lea inside sitting down"
+    },
+    {
+      "code": "C05",
+      "id": "glm",
+      "name": "GLM",
+      "title": "黑发尖帽",
+      "color": "#5b6b8c",
+      "type": "llm",
+      "base_url": "https://open.bigmodel.cn/api/paas/v4",
+      "model": "glm-5.3-flash",
+      "api_key_env": "ZHIPU_API_KEY",
+      "voice_id": "6c364011f30747c9a0a89eec3787cadc",
+      "voice_sim": {
+        "pitch": 0.95,
+        "rate": 0.9,
+        "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
+      },
+      "voice_name": "Shuxian - Clear & Trustworthy"
+    },
+    {
+      "code": "C06",
+      "id": "gemini",
+      "name": "Gemini",
+      "title": "紫发双马尾",
+      "color": "#a66bff",
+      "type": "llm",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+      "model": "gemini-2.5-flash",
+      "api_key_env": "GEMINI_API_KEY",
+      "voice_id": "",
+      "voice_sim": {
+        "pitch": 1.6,
+        "rate": 1.15,
+        "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
+      }
+    },
+    {
+      "code": "C07",
+      "id": "perplexity",
+      "name": "Perplexity",
+      "title": "墨绿法师",
+      "color": "#2f8f7a",
+      "type": "llm",
+      "base_url": "https://api.perplexity.ai",
+      "model": "sonar",
+      "api_key_env": "PERPLEXITY_API_KEY",
+      "voice_id": "",
+      "voice_sim": {
+        "pitch": 0.9,
+        "rate": 0.92,
+        "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
+      }
+    },
+    {
+      "code": "C08",
+      "id": "mistral",
+      "name": "Mistral",
+      "title": "法棍红帽",
+      "color": "#ff7a2a",
+      "type": "llm",
+      "base_url": "https://api.mistral.ai/v1",
+      "model": "mistral-small-latest",
+      "api_key_env": "MISTRAL_API_KEY",
+      "voice_id": "",
+      "voice_sim": {
+        "pitch": 1.45,
+        "rate": 1.1,
+        "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
+      }
+    },
+    {
+      "code": "C09",
+      "id": "grok",
+      "name": "Grok",
+      "title": "金发持斧",
+      "color": "#c9a24a",
+      "type": "llm",
+      "base_url": "https://api.x.ai/v1",
+      "model": "grok-3-mini",
+      "api_key_env": "XAI_API_KEY",
+      "voice_id": "",
+      "voice_sim": {
+        "pitch": 1.05,
+        "rate": 1.1,
+        "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
+      }
+    },
+    {
+      "code": "C10",
+      "id": "meta",
+      "name": "Meta",
+      "title": "白发狐耳",
+      "color": "#e0c9a6",
+      "type": "llm",
+      "base_url": "https://api.llama.com/compat/v1",
+      "model": "Llama-4-Maverick-17B-128E-Instruct-FP8",
+      "api_key_env": "LLAMA_API_KEY",
+      "voice_id": "",
+      "voice_sim": {
+        "pitch": 1.3,
+        "rate": 0.95,
+        "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
+      }
+    },
+    {
+      "code": "C11",
+      "id": "seed",
+      "name": "豆包",
+      "title": "抱娃双马尾",
+      "color": "#6a8cff",
+      "type": "llm",
+      "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+      "model": "doubao-seed-2-0-lite-260428",
+      "api_key_env": "ARK_API_KEY",
+      "voice_id": "1776ddbd05374fa480e92f0297bbc67e",
+      "voice_sim": {
+        "pitch": 1.5,
+        "rate": 1.05,
+        "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
+      },
+      "art": "bust",
+      "voice_name": "Melissa - Friendly"
+    },
+    {
+      "code": "C12",
+      "id": "wenxin",
+      "name": "文心一言",
+      "title": "书堆轮椅",
+      "color": "#3a5bd0",
+      "type": "llm",
+      "base_url": "https://qianfan.baidubce.com/v2",
+      "model": "ernie-4.5-turbo-32k",
+      "api_key_env": "QIANFAN_API_KEY",
+      "voice_id": "",
+      "voice_sim": {
+        "pitch": 1.05,
+        "rate": 0.9,
+        "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
+      }
+    },
+    {
+      "code": "C13",
+      "id": "github",
+      "name": "GitHub",
+      "title": "黑猫触手",
+      "color": "#5aa04a",
+      "type": "llm",
+      "base_url": "https://models.github.ai/inference",
+      "model": "openai/gpt-4.1-mini",
+      "api_key_env": "GITHUB_TOKEN",
+      "voice_id": "",
+      "voice_sim": {
+        "pitch": 1.35,
+        "rate": 1.1,
+        "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
+      }
+    },
+    {
+      "code": "C14",
+      "id": "gitlab",
+      "name": "GitLab",
+      "title": "橙狐长裙",
+      "color": "#fc6d26",
+      "type": "llm",
+      "base_url": "",
+      "model": "",
+      "api_key_env": "GITLAB_LLM_API_KEY",
+      "voice_id": "",
+      "voice_sim": {
+        "pitch": 1.2,
+        "rate": 1.0,
+        "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
+      }
+    },
+    {
+      "code": "C15",
+      "id": "gitee",
+      "name": "Gitee",
+      "title": "红衣小恶魔",
+      "color": "#c71d23",
+      "type": "llm",
+      "base_url": "https://ai.gitee.com/v1",
+      "model": "Qwen2.5-72B-Instruct",
+      "api_key_env": "GITEE_AI_API_KEY",
+      "voice_id": "",
+      "voice_sim": {
+        "pitch": 1.4,
+        "rate": 1.1,
+        "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
+      }
+    },
+    {
+      "code": "C16",
+      "id": "hunyuan",
+      "name": "腾讯混元",
+      "title": "黑发红围巾",
+      "color": "#d43a3a",
+      "type": "llm",
+      "base_url": "https://api.hunyuan.cloud.tencent.com/v1",
+      "model": "hy4-preview",
+      "api_key_env": "HUNYUAN_API_KEY",
+      "voice_id": "080f8e5cb3ae424989242b0efe5205e6",
+      "voice_sim": {
+        "pitch": 1.0,
+        "rate": 1.0,
+        "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
+      },
+      "voice_name": "Ceecee - Serious"
+    },
+    {
+      "code": "C17",
+      "id": "rwkv",
+      "name": "RWKV",
+      "title": "乌鸦羽翼",
+      "color": "#4a3ad0",
+      "type": "llm",
+      "base_url": "",
+      "model": "",
+      "api_key_env": "RWKV_API_KEY",
+      "voice_id": "",
+      "voice_sim": {
+        "pitch": 0.85,
+        "rate": 0.95,
+        "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
+      }
+    },
+    {
+      "code": "C18",
+      "id": "hailuo",
+      "name": "海螺",
+      "title": "橙发信使",
+      "color": "#ff9a5a",
+      "type": "llm",
+      "base_url": "https://api.minimaxi.com/v1",
+      "model": "MiniMax-M2",
+      "api_key_env": "MINIMAX_API_KEY",
+      "voice_id": "",
+      "voice_sim": {
+        "pitch": 1.55,
+        "rate": 1.15,
+        "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
+      }
+    },
+    {
+      "code": "C19",
+      "id": "opencode",
+      "name": "OpenCode",
+      "title": "黑角少女",
+      "color": "#8a8a9a",
+      "type": "llm",
+      "base_url": "",
+      "model": "",
+      "api_key_env": "OPENCODE_API_KEY",
+      "voice_id": "",
+      "voice_sim": {
+        "pitch": 0.9,
+        "rate": 1.05,
+        "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
+      }
+    },
+    {
+      "code": "C20",
+      "id": "gpt",
+      "name": "GPT",
+      "title": "白发龙娘",
+      "color": "#8fd0e8",
+      "type": "llm",
+      "base_url": "https://api.openai.com/v1",
+      "model": "gpt-4o-mini",
+      "api_key_env": "OPENAI_API_KEY",
+      "voice_id": "",
+      "voice_sim": {
+        "pitch": 1.2,
+        "rate": 1.0,
+        "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
+      }
+    },
+    {
+      "code": "C21",
+      "id": "mimo",
+      "name": "小米 MiMo",
+      "title": "白发橙领带少女",
+      "color": "#ff6a1a",
+      "type": "llm",
+      "base_url": "https://api.xiaomimimo.com/v1",
+      "model": "mimo-v2.6-flash",
+      "api_key_env": "MIMO_API_KEY",
+      "voice_id": "dd00b0b9c5284a20bcdb5d1d1802362f",
+      "voice_sim": {
+        "pitch": 1.35,
+        "rate": 1.1,
+        "voice": "Xiaoyi|Xiaoxiao|Huihui|Female"
+      },
+      "voice_name": "Lea on balcony"
+    },
+    {
+      "code": "C22",
+      "id": "stepfun",
+      "name": "阶跃星辰",
+      "title": "橙色机器人",
+      "color": "#ff8a2a",
+      "type": "llm",
+      "base_url": "https://api.stepfun.com/v1",
+      "model": "step-5-preview",
+      "api_key_env": "STEPFUN_API_KEY",
+      "voice_id": "4f8c25eb83f4488d82c2a2e38dc0a9d3",
+      "voice_sim": {
+        "pitch": 0.8,
+        "rate": 1.05,
+        "voice": "Yunxi|Yunyang|Kangkang|Male"
+      },
+      "art": "bust",
+      "voice_name": "Haoran - Bright & Articulate"
+    }
+  ],
+  "tts": {
+    "provider": "heygen",
+    "model": "heygen-voice-1-turbo-free",
+    "api_key_env": "HEYGEN_API_KEY",
+    "timeout": 30,
+    "fallback": "browser"
+  }
+}
