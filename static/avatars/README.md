@@ -26,6 +26,8 @@
 | C18 | `hailuo.png` | 海螺 | 橙发信使 |
 | C19 | `opencode.png` | OpenCode | 黑角少女 |
 | C20 | `gpt.png` | GPT | 白发龙娘 |
+| C21 | `mimo.png` | 小米 MiMo | 白发橙领带少女 |
+| C22 | `stepfun.png` | 阶跃星辰 | 橙色机器人 |
 
 网页会自动处理立绘，不用自己抠图：
 

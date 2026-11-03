@@ -198,7 +198,8 @@
         "pitch": 1.5,
         "rate": 1.05,
         "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
-      }
+      },
+      "art": "bust"
     },
     {
       "code": "C12",
@@ -352,6 +353,41 @@
         "rate": 1.0,
         "voice": "Xiaoyi|Xiaoxiao|Huihui|Tingting|Female"
       }
+    },
+    {
+      "code": "C21",
+      "id": "mimo",
+      "name": "小米 MiMo",
+      "title": "白发橙领带少女",
+      "color": "#ff6a1a",
+      "type": "llm",
+      "base_url": "https://api.xiaomimimo.com/v1",
+      "model": "mimo-v2.6-flash",
+      "api_key_env": "MIMO_API_KEY",
+      "voice_id": "",
+      "voice_sim": {
+        "pitch": 1.35,
+        "rate": 1.1,
+        "voice": "Xiaoyi|Xiaoxiao|Huihui|Female"
+      }
+    },
+    {
+      "code": "C22",
+      "id": "stepfun",
+      "name": "阶跃星辰",
+      "title": "橙色机器人",
+      "color": "#ff8a2a",
+      "type": "llm",
+      "base_url": "https://api.stepfun.com/v1",
+      "model": "step-3.7-flash",
+      "api_key_env": "STEPFUN_API_KEY",
+      "voice_id": "",
+      "voice_sim": {
+        "pitch": 0.8,
+        "rate": 1.05,
+        "voice": "Yunxi|Yunyang|Kangkang|Male"
+      },
+      "art": "bust"
     }
   ],
   "tts": {

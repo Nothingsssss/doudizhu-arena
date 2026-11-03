@@ -1,5 +1,5 @@
 {
-  "_说明": "20 个二创形象（见形象和模型对应图 C01~C20）想要的声音。player 和 config.json 里选手的 name 一致；tags 用来在音色列表里打分匹配；line 是试听台词。",
+  "_说明": "22 个二创形象（形象和模型对应图 C01~C20，加上 C21 小米 MiMo、C22 阶跃星辰）想要的声音。player 和 config.json 里选手的 name 一致；tags 用来在音色列表里打分匹配；line 是试听台词。",
   "characters": [
     {
       "id": "claude",
@@ -471,6 +471,52 @@
         "cute"
       ],
       "line": "龙之吐息——王炸！"
+    },
+    {
+      "id": "mimo",
+      "code": "C21",
+      "player": "小米 MiMo",
+      "image": "白发橙领带少女",
+      "voice": "活泼、俏皮、少女",
+      "gender": "female",
+      "tags": [
+        "energetic",
+        "cheerful",
+        "young",
+        "girl",
+        "cute",
+        "活泼",
+        "俏皮",
+        "少女"
+      ],
+      "avoid": [
+        "old",
+        "deep",
+        "mature"
+      ],
+      "line": "嘿嘿，这把我算好了，炸弹留着压你！"
+    },
+    {
+      "id": "stepfun",
+      "code": "C22",
+      "player": "阶跃星辰",
+      "image": "橙色机器人",
+      "voice": "机械感、憨厚、少年",
+      "gender": "male",
+      "tags": [
+        "robot",
+        "young",
+        "friendly",
+        "calm",
+        "机器人",
+        "憨厚",
+        "少年"
+      ],
+      "avoid": [
+        "old",
+        "female"
+      ],
+      "line": "计算完毕，一步一步来，这手我要了。"
     }
   ]
 }

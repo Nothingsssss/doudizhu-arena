@@ -13,7 +13,7 @@
 ## 运行
 
 ```bash
-python server.py                            # config.json：20 个角色，没设密钥的先本地模拟
+python server.py                            # config.json：22 个角色，没设密钥的先本地模拟
 python server.py --config config.demo.json  # 演示模式：保证 14 种牌型都打出来
 ```
 
@@ -62,7 +62,7 @@ python server.py --config config.demo.json  # 演示模式：保证 14 种牌型
 
 ## 头像和名字
 
-`config.json` 里每个选手有 `code`（形象编号 C01~C20）、`id`、`name`（显示名）、`title`（形象名）、`color`（主题色）。
+`config.json` 里每个选手有 `code`（形象编号 C01~C22）、`id`、`name`（显示名）、`title`（形象名）、`color`（主题色）。
 全身立绘放到 `static/avatars/<id>.png`，白底会自动去掉，详见 [static/avatars/README.md](static/avatars/README.md)。没放图的显示自动生成的徽章。
 
 ## Live2D 虚拟人（可选）
@@ -86,7 +86,7 @@ python server.py --config config.demo.json  # 演示模式：保证 14 种牌型
 
 ### 大模型
 
-`config.json` 已经按形象对应图放好 20 个角色（前 3 个先上桌，其余排队），并预留了接口：
+`config.json` 已经按形象对应图放好 22 个角色（前 3 个先上桌，其余排队），并预留了接口：
 
 | 选手 | 接口地址 | 模型 | 密钥环境变量 |
 |---|---|---|---|
@@ -110,6 +110,8 @@ python server.py --config config.demo.json  # 演示模式：保证 14 种牌型
 | C18 海螺 | `https://api.minimaxi.com/v1` | `MiniMax-M2` | `MINIMAX_API_KEY` |
 | C19 OpenCode | （待填） | （待填） | `OPENCODE_API_KEY` |
 | C20 GPT | `https://api.openai.com/v1` | `gpt-4o-mini` | `OPENAI_API_KEY` |
+| C21 小米 MiMo | `https://api.xiaomimimo.com/v1` | `mimo-v2.6-flash` | `MIMO_API_KEY` |
+| C22 阶跃星辰 | `https://api.stepfun.com/v1` | `step-3.7-flash` | `STEPFUN_API_KEY` |
 
 GitLab、RWKV、OpenCode 没有统一的公开接口，`base_url`、`model` 留空，填上你自己的网关或本地部署地址就能接入（留空时一直本地模拟）。
 模型名按你实际开通的改。**设了哪个密钥，哪个选手就接真实模型；没设的继续本地模拟**（名牌上显示「模拟」），所以可以一个一个接：
