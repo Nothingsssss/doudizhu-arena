@@ -378,14 +378,15 @@ function buildSeat(i) {
   const meta = [p.title, p.model].filter(Boolean).map(esc).join(" · ");
   el.innerHTML = `
     <div class="portrait"><div class="aura"></div><div class="${artCls(s.name)}" data-name="${esc(s.name)}">${artHtml(s.name)}</div>${CROWN}</div>
-    ${p.faces ? `<div class="expr"><i></i></div>` : ""}
-    <div class="ai-tag">AI</div>
     <div class="alarm-light"></div>
     <div class="plate">
-      <div class="role wait"><span>叫分中</span></div>
-      <div class="nameplate"><span class="chip">AI</span><b class="name">${esc(s.name || "等待入座")}</b></div>
-      <div class="subrow"><div class="scoreplate">积分 <b class="score">0</b></div><div class="countplate"><i class="cb"></i><b class="cnt">0</b>张</div><span class="stk"></span></div>
-      <div class="modelline">${meta}${p.sim ? `<span class="simtag">模拟</span>` : ""}</div>
+      ${p.faces ? `<div class="expr"><i></i></div>` : ""}
+      <div class="pstack">
+        <div class="prole"><div class="role wait"><span>叫分中</span></div><span class="stk"></span></div>
+        <div class="nameplate"><span class="chip">AI</span><b class="name">${esc(s.name || "等待入座")}</b></div>
+        <div class="subrow"><div class="scoreplate">积分 <b class="score">0</b></div><div class="countplate"><i class="cb"></i><b class="cnt">0</b>张</div></div>
+        <div class="modelline">${meta}${p.sim ? `<span class="simtag">模拟</span>` : ""}</div>
+      </div>
     </div>
     <div class="hand"></div>`;
   mountL2D(i);
@@ -414,7 +415,7 @@ function renderHand(i, anim) {
   if (i === 2) {
     const cs = cards.length > 1 ? Math.min(56, (1100 - 100) / (cards.length - 1)) : 56;
     h.innerHTML = cardsHtml(cards, 20, "sz-l" + deal, `--cs:${cs.toFixed(1)}px`);
-  } else h.innerHTML = cardsHtml(cards, 20, "sz-s" + deal);
+  } else h.innerHTML = cardsHtml(cards, Math.max(9, Math.ceil(cards.length / 2)), "sz-s" + deal);   // 两家的手牌分两行，不挡立绘
 }
 function renderPlayed(i, anim) {
   const s = G.seats[i], el = $("played" + i);

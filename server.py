@@ -209,6 +209,16 @@ def main():
         p.faces = resolve_avatar(p, "faces", "-faces")
         p.live2d = resolve_live2d(p)
         p.cutins = resolve_cutins(p)
+    # 没有立绘的角色不上场（arena.only_with_art 设成 false 可以关掉）
+    if a.get("only_with_art", True):
+        drawn = [p for p in players if p.avatar]
+        skipped = [p.name for p in players if not p.avatar]
+        if len(drawn) >= 3:
+            players = drawn
+            if skipped:
+                print(f"[avatar] 没有立绘、这次不上场：{'、'.join(skipped)}", flush=True)
+        else:
+            print("[avatar] 有立绘的角色不足 3 个，全部角色照常上场", flush=True)
     arena = Arena(players, emit,
                   move_delay=a.get("move_delay", 1.5),
                   game_pause=a.get("game_pause", 8),

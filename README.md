@@ -192,6 +192,7 @@ python server.py --config config.demo.json     # 或者对任意配置加 --demo
 | `move_delay` | 1.5 | 每手牌之间的停顿（秒），方便观众看 |
 | `game_pause` | 8 | 每局结束后的停顿（秒），显示谁下场 |
 | `eliminate_forever` | false | true：输的人直接出局，不再排队 |
+| `only_with_art` | true | 没有立绘的角色不上场（有立绘的不足 3 个时自动全部上场） |
 | `max_games` | null | 最多打几局，null 为一直打 |
 | `seed` | null | 随机种子，用于复现 |
 | `start_score` | 1000 | 初始积分 |

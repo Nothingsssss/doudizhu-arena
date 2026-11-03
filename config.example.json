@@ -4,6 +4,7 @@
     "move_delay": 1.5,
     "game_pause": 8,
     "eliminate_forever": false,
+    "only_with_art": true,
     "max_games": null,
     "start_score": 1000,
     "score_unit": 100
