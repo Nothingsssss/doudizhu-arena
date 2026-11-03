@@ -128,8 +128,25 @@ async function processArt(src, p) {
     fx = n ? sx / n : (x0 + x1) / 2; fs = Math.min(bh * 0.17, bw); fy = top + fs * 0.48;
   }
   const fc = document.createElement("canvas"); fc.width = fc.height = 256;
-  fc.getContext("2d").drawImage(cv, fx - fs / 2, fy - fs / 2, fs, fs, 0, 0, 256, 256);
+  const sheet = p.faces ? await sheetFace(p.faces).catch(() => null) : null;
+  if (sheet) fc.getContext("2d").drawImage(sheet.img, sheet.x, sheet.y, sheet.s, sheet.s, 0, 0, 256, 256);
+  else fc.getContext("2d").drawImage(cv, fx - fs / 2, fy - fs / 2, fs, fs, 0, 0, 256, 256);
   return { full: await toUrl(full), face: await toUrl(fc) };
+}
+// 表情图：2 行 5 列的头像表，取第一格（平常表情），裁成头到肩的方图
+async function sheetFace(src) {
+  const img = await loadImg(src);
+  const cw = img.naturalWidth / 5, ch = img.naturalHeight / 2;
+  const cv = document.createElement("canvas"); cv.width = Math.round(cw); cv.height = Math.round(ch);
+  const g = cv.getContext("2d", { willReadFrequently: true });
+  g.drawImage(img, 0, 0, cw, ch, 0, 0, cv.width, cv.height);
+  const W = cv.width, H = cv.height, d = g.getImageData(0, 0, W, H).data;
+  let x0 = W, x1 = -1, y0 = H;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (d[(y * W + x) * 4 + 3] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; }
+  if (x1 < 0) return null;
+  const s = Math.min(Math.max(x1 - x0 + 1, H * 0.6), H - y0, W);
+  const x = Math.max(0, Math.min(W - s, (x0 + x1) / 2 - s / 2));
+  return { img, x, y: Math.max(0, y0 - s * 0.02), s };
 }
 function artOf(name, src) {
   if (!ART.has(src)) ART.set(src, processArt(src, prof(name)).catch(() => null));

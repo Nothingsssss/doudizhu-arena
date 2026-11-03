@@ -12,7 +12,7 @@ class Player:
     sim = False   # True：没接真实接口，由本地机器人模拟出牌
 
     def __init__(self, name, avatar="", color="", voice_id="", id="", title="", voice_sim=None,
-                 cutout="auto", code="", art="full", face=None, **kw):
+                 cutout="auto", code="", art="full", face=None, faces="", **kw):
         self.name = name
         self.id = id or re.sub(r"\W+", "", name.lower()) or "player"
         self.title = title          # 形象名，如"鲸鱼女仆"，显示在名字下面
@@ -24,12 +24,13 @@ class Player:
         self.cutout = cutout
         self.art = art              # "full" 全身立绘（牌桌上显示上半身）；"bust" 半身图（整张显示）
         self.face = face            # 小头像裁剪位置 [脸中心x%, 脸中心y%, 框大小%]，按整张图算；不填自动找
+        self.faces = faces          # 表情图（2 行 5 列的头像表），默认 static/avatars/<id>-faces.png；第一格当小头像
         self.color = color          # 主题色，如 "#4f8cff"
         self.model = kw.get("model", "规则机器人" if kw.get("type") == "bot" else "")
 
     def profile(self):
         return {"id": self.id, "code": self.code, "title": self.title, "avatar": self.avatar,
-                "cutout": self.cutout, "art": self.art, "face": self.face,
+                "cutout": self.cutout, "art": self.art, "face": self.face, "faces": self.faces,
                 "color": self.color, "model": self.model, "sim": self.sim, "voice_sim": self.voice_sim}
 
     def bid(self, view):
@@ -218,7 +219,7 @@ def make_player(cfg, simulate=None):
 
 
 # 模拟玩家沿用的展示字段
-SIM_KEEP = ("name", "id", "code", "title", "avatar", "cutout", "art", "face", "color", "voice_id", "voice_sim", "model")
+SIM_KEEP = ("name", "id", "code", "title", "avatar", "cutout", "art", "face", "faces", "color", "voice_id", "voice_sim", "model")
 
 
 __all__ = ["Player", "BotPlayer", "LLMPlayer", "make_player", "NAMES"]

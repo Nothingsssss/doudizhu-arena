@@ -66,19 +66,21 @@ class Bus:
 AVATAR_EXT = (".png", ".webp", ".jpg", ".jpeg", ".gif")
 
 
-def resolve_avatar(p):
+def resolve_avatar(p, field="avatar", suffix=""):
     """头像：配置里写了网址就直接用；写了本地路径或没写，就到 static/avatars/ 找 <id>.png/.webp/.jpg。
     找不到返回空字符串，网页显示自动生成的徽章，不会出现裂图。"""
-    av = (p.avatar or "").strip()
+    av = (getattr(p, field, "") or "").strip()
     if av.startswith(("http://", "https://", "data:")):
         return av
     cands = [av] if av else []
     for stem in dict.fromkeys(filter(None, [p.id, p.code, p.code.lower(), f"{p.code}-{p.id}".lower() if p.code else ""])):
-        cands += [f"avatars/{stem}{e}" for e in AVATAR_EXT + tuple(x.upper() for x in AVATAR_EXT)]
+        cands += [f"avatars/{stem}{suffix}{e}" for e in AVATAR_EXT + tuple(x.upper() for x in AVATAR_EXT)]
     for c in cands:
         f = (STATIC / c.lstrip("/")).resolve()
         if STATIC.resolve() in f.parents and f.is_file():
             return c.lstrip("/")
+    if suffix:
+        return ""
     print(f"[avatar] {p.name}：没找到立绘，放一张图到 static/avatars/{p.id}.png（或 {p.code or p.id}.png）即可", flush=True)
     return ""
 
@@ -162,6 +164,7 @@ def main():
         players = [make_player(p) for p in cfg["players"]]
     for p in players:
         p.avatar = resolve_avatar(p)
+        p.faces = resolve_avatar(p, "faces", "-faces")
     arena = Arena(players, emit,
                   move_delay=a.get("move_delay", 1.5),
                   game_pause=a.get("game_pause", 8),
