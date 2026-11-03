@@ -73,12 +73,13 @@ def resolve_avatar(p):
     if av.startswith(("http://", "https://", "data:")):
         return av
     cands = [av] if av else []
-    cands += [f"avatars/{p.id}{e}" for e in AVATAR_EXT]
+    for stem in dict.fromkeys(filter(None, [p.id, p.code, p.code.lower(), f"{p.code}-{p.id}".lower() if p.code else ""])):
+        cands += [f"avatars/{stem}{e}" for e in AVATAR_EXT + tuple(x.upper() for x in AVATAR_EXT)]
     for c in cands:
         f = (STATIC / c.lstrip("/")).resolve()
         if STATIC.resolve() in f.parents and f.is_file():
             return c.lstrip("/")
-    print(f"[avatar] {p.name}：没找到头像，放一张图到 static/avatars/{p.id}.png 即可", flush=True)
+    print(f"[avatar] {p.name}：没找到立绘，放一张图到 static/avatars/{p.id}.png（或 {p.code or p.id}.png）即可", flush=True)
     return ""
 
 

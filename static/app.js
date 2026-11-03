@@ -41,15 +41,112 @@ function emblemHtml(name) {
   return `<div class="emblem"><div class="hex"></div><b>${initial(name)}</b><small>${esc(p.title || name || "")}</small></div>`;
 }
 // 图片加载失败时换成徽章
-window.__avErr = (img) => { const art = img.closest(".art"); if (art) { art.classList.remove("masked"); art.innerHTML = emblemHtml(art.dataset.name); } else img.replaceWith(document.createTextNode(img.dataset.i || "?")); };
+window.__avErr = (img) => { const art = img.closest(".art"); if (art) { art.className = "art"; art.innerHTML = emblemHtml(art.dataset.name); } else img.replaceWith(document.createTextNode(img.dataset.i || "?")); };
+// 立绘先不给 src，处理完（去背景、裁边、裁脸）再填进去，避免先闪一下白底原图
 function artHtml(name) {
   const av = prof(name).avatar;
-  return av ? `<img src="${esc(av)}" alt="" onerror="__avErr(this)">` : emblemHtml(name);
+  return av ? `<img data-art="${esc(av)}" data-name="${esc(name)}" alt="">` : emblemHtml(name);
+}
+function artCls(name) {
+  const p = prof(name);
+  if (!p.avatar) return "art";
+  return "art" + (p.art === "bust" ? "" : " full") + (p.cutout === false ? " masked" : "");
 }
 function mini(name, cls = "") {
   const av = prof(name).avatar;
-  return `<div class="mini ${cls}" style="${pcVars(name)}">${av ? `<img src="${esc(av)}" alt="" data-i="${initial(name)}" onerror="__avErr(this)">` : initial(name)}</div>`;
+  return `<div class="mini ${cls}" style="${pcVars(name)}">${av ? `<img data-face="${esc(av)}" data-name="${esc(name)}" data-i="${initial(name)}" alt="">` : initial(name)}</div>`;
 }
+
+/* ================= 立绘处理 =================
+ * 形象图多是白底全身立绘，这里在浏览器里处理一次并缓存：
+ *   1. cutout="auto"：从图片四边往里找和背景同色的连通区域，变成透明（人物的描边会挡住，衣服里的白色不受影响）
+ *   2. 裁掉四周透明边，让人物顶到框
+ *   3. 裁出脸部方图给排行榜、战况、结算用（找人物最上面一段够宽的地方当头，细长的武器、法杖不算；可用 face 手动指定） */
+const ART = new Map();
+const loadImg = (src) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+const toUrl = (cv) => new Promise((res) => cv.toBlob((b) => res(b ? URL.createObjectURL(b) : cv.toDataURL()), "image/png"));
+function removeBg(d, W, H) {
+  const at = (x, y) => (y * W + x) * 4;
+  const corners = [at(0, 0), at(W - 1, 0), at(0, H - 1), at(W - 1, H - 1)];
+  if (corners.every((i) => d[i + 3] < 20)) return;            // 已经是透明底
+  const samples = [];
+  for (let x = 0; x < W; x += Math.max(1, W >> 5)) samples.push(at(x, 0), at(x, H - 1));
+  for (let y = 0; y < H; y += Math.max(1, H >> 5)) samples.push(at(0, y), at(W - 1, y));
+  const med = (o) => samples.map((i) => d[i + o]).sort((a, b) => a - b)[samples.length >> 1];
+  const br = med(0), bgc = med(1), bb = med(2), T = 2700;
+  const dist = (i) => { const r = d[i] - br, g = d[i + 1] - bgc, b = d[i + 2] - bb; return r * r + g * g + b * b; };
+  const seen = new Uint8Array(W * H), st = [];
+  const push = (x, y) => { const p = y * W + x; if (!seen[p] && d[p * 4 + 3] > 0 && dist(p * 4) < T) { seen[p] = 1; st.push(p); } };
+  for (let x = 0; x < W; x++) { push(x, 0); push(x, H - 1); }
+  for (let y = 0; y < H; y++) { push(0, y); push(W - 1, y); }
+  while (st.length) {
+    const p = st.pop(), x = p % W, y = (p / W) | 0;
+    d[p * 4 + 3] = 0;
+    if (x > 0) push(x - 1, y); if (x < W - 1) push(x + 1, y); if (y > 0) push(x, y - 1); if (y < H - 1) push(x, y + 1);
+  }
+  // 边缘羽化：紧挨背景、颜色又接近背景的像素半透明，去掉白边
+  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+    const p = y * W + x, i = p * 4;
+    if (seen[p] || !(seen[p - 1] || seen[p + 1] || seen[p - W] || seen[p + W])) continue;
+    const k = dist(i);
+    if (k < T * 4) d[i + 3] = Math.min(d[i + 3], Math.round(255 * Math.sqrt(k / (T * 4))));
+  }
+}
+async function processArt(src, p) {
+  const img = await loadImg(src);
+  const k = Math.min(1, 1600 / img.naturalHeight);
+  const W = Math.max(1, Math.round(img.naturalWidth * k)), H = Math.max(1, Math.round(img.naturalHeight * k));
+  const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+  const g = cv.getContext("2d", { willReadFrequently: true });
+  g.drawImage(img, 0, 0, W, H);
+  let id;
+  try { id = g.getImageData(0, 0, W, H); } catch (e) { return { full: src, face: src, raw: true }; }   // 跨域图片读不了像素，原样用
+  const d = id.data;
+  if (p.cutout === "auto" || p.cutout === undefined) removeBg(d, W, H);
+  g.putImageData(id, 0, 0);
+  // 人物外框
+  let x0 = W, x1 = -1, y0 = H, y1 = -1;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (d[(y * W + x) * 4 + 3] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  if (x1 < 0) return { full: src, face: src, raw: true };
+  const pad = Math.round(H * 0.01);
+  x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(W - 1, x1 + pad); y1 = Math.min(H - 1, y1 + pad);
+  const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+  const full = document.createElement("canvas"); full.width = bw; full.height = bh;
+  full.getContext("2d").drawImage(cv, x0, y0, bw, bh, 0, 0, bw, bh);
+  // 脸
+  let fx, fy, fs;
+  if (Array.isArray(p.face) && p.face.length >= 2) {
+    fx = (p.face[0] / 100) * W; fy = (p.face[1] / 100) * H; fs = ((p.face[2] || 16) / 100) * H;
+  } else {
+    let top = y0;
+    for (let y = y0; y < y1; y++) {
+      let n = 0; for (let x = x0; x <= x1; x++) if (d[(y * W + x) * 4 + 3] > 24) n++;
+      if (n > bw * 0.12) { top = y; break; }
+    }
+    let sx = 0, n = 0;
+    for (let y = top; y < Math.min(y1, top + bh * 0.1); y++) for (let x = x0; x <= x1; x++) if (d[(y * W + x) * 4 + 3] > 24) { sx += x; n++; }
+    fx = n ? sx / n : (x0 + x1) / 2; fs = Math.min(bh * 0.17, bw); fy = top + fs * 0.48;
+  }
+  const fc = document.createElement("canvas"); fc.width = fc.height = 256;
+  fc.getContext("2d").drawImage(cv, fx - fs / 2, fy - fs / 2, fs, fs, 0, 0, 256, 256);
+  return { full: await toUrl(full), face: await toUrl(fc) };
+}
+function artOf(name, src) {
+  if (!ART.has(src)) ART.set(src, processArt(src, prof(name)).catch(() => null));
+  return ART.get(src);
+}
+function hydrate(root) {
+  root.querySelectorAll("img[data-art]:not([src]), img[data-face]:not([src])").forEach((img) => {
+    const src = img.dataset.art || img.dataset.face;
+    artOf(img.dataset.name, src).then((r) => {
+      if (!r) return window.__avErr(img);
+      img.src = img.dataset.art ? r.full : r.face;
+      if (!r.raw && img.dataset.face) img.classList.add("face");
+    });
+  });
+}
+new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) hydrate(n); })
+  .observe(document.getElementById("stage"), { childList: true, subtree: true });
 
 /* ================= 场景（背景 / 牌桌 / 牌匾） ================= */
 function pagoda(cx, base, tiers, w, h) {
@@ -161,7 +258,7 @@ function buildSeat(i) {
   el.style.cssText = pcVars(s.name);
   const meta = [p.title, p.model].filter(Boolean).map(esc).join(" · ");
   el.innerHTML = `
-    <div class="portrait"><div class="aura"></div><div class="art${p.avatar && !p.cutout ? " masked" : ""}" data-name="${esc(s.name)}">${artHtml(s.name)}</div>${CROWN}</div>
+    <div class="portrait"><div class="aura"></div><div class="${artCls(s.name)}" data-name="${esc(s.name)}">${artHtml(s.name)}</div>${CROWN}</div>
     <div class="ai-tag">AI</div>
     <div class="alarm-light"></div>
     <div class="plate">

@@ -13,7 +13,7 @@
 ## 运行
 
 ```bash
-python server.py                            # config.json：5 个角色，没设密钥的先本地模拟
+python server.py                            # config.json：20 个角色，没设密钥的先本地模拟
 python server.py --config config.demo.json  # 演示模式：保证 14 种牌型都打出来
 ```
 
@@ -57,23 +57,39 @@ python server.py --config config.demo.json  # 演示模式：保证 14 种牌型
 
 ## 头像和名字
 
-`config.json` 里每个选手有 `id`、`name`（显示名）、`title`（形象名，显示在名字下面）、`color`（主题色）。
-立绘放到 `static/avatars/<id>.png`，详见 [static/avatars/README.md](static/avatars/README.md)。没放图的显示自动生成的徽章。
+`config.json` 里每个选手有 `code`（形象编号 C01~C20）、`id`、`name`（显示名）、`title`（形象名）、`color`（主题色）。
+全身立绘放到 `static/avatars/<id>.png`，白底会自动去掉，详见 [static/avatars/README.md](static/avatars/README.md)。没放图的显示自动生成的徽章。
 
 ## 接入真实接口
 
 ### 大模型
 
-`config.json` 已经给 5 个角色预留好了接口：
+`config.json` 已经按形象对应图放好 20 个角色（前 3 个先上桌，其余排队），并预留了接口：
 
 | 选手 | 接口地址 | 模型 | 密钥环境变量 |
 |---|---|---|---|
-| DeepSeek | `https://api.deepseek.com/v1` | `deepseek-chat` | `DEEPSEEK_API_KEY` |
-| 通义千问 | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-plus` | `DASHSCOPE_API_KEY` |
-| MiMo | `https://api.xiaomimimo.com/v1` | `mimo-v2.6-flash` | `MIMO_API_KEY` |
-| 豆包 | `https://ark.cn-beijing.volces.com/api/v3` | `doubao-seed-1-6-250615`（改成你在方舟开通的模型或接入点 ID） | `ARK_API_KEY` |
-| Claude | `https://api.anthropic.com/v1`（OpenAI 兼容层） | `claude-sonnet-4-5` | `ANTHROPIC_API_KEY` |
+| C01 Claude | `https://api.anthropic.com/v1` | `claude-sonnet-4-5` | `ANTHROPIC_API_KEY` |
+| C02 DeepSeek | `https://api.deepseek.com/v1` | `deepseek-chat` | `DEEPSEEK_API_KEY` |
+| C03 Kimi | `https://api.moonshot.cn/v1` | `kimi-latest` | `MOONSHOT_API_KEY` |
+| C04 通义千问 | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-plus` | `DASHSCOPE_API_KEY` |
+| C05 GLM | `https://open.bigmodel.cn/api/paas/v4` | `glm-4-flash` | `ZHIPU_API_KEY` |
+| C06 Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-2.5-flash` | `GEMINI_API_KEY` |
+| C07 Perplexity | `https://api.perplexity.ai` | `sonar` | `PERPLEXITY_API_KEY` |
+| C08 Mistral | `https://api.mistral.ai/v1` | `mistral-small-latest` | `MISTRAL_API_KEY` |
+| C09 Grok | `https://api.x.ai/v1` | `grok-3-mini` | `XAI_API_KEY` |
+| C10 Meta | `https://api.llama.com/compat/v1` | `Llama-4-Maverick-17B-128E-Instruct-FP8` | `LLAMA_API_KEY` |
+| C11 豆包 | `https://ark.cn-beijing.volces.com/api/v3` | `doubao-seed-1-6-250615` | `ARK_API_KEY` |
+| C12 文心一言 | `https://qianfan.baidubce.com/v2` | `ernie-4.5-turbo-32k` | `QIANFAN_API_KEY` |
+| C13 GitHub | `https://models.github.ai/inference` | `openai/gpt-4.1-mini` | `GITHUB_TOKEN` |
+| C14 GitLab | （待填） | （待填） | `GITLAB_LLM_API_KEY` |
+| C15 Gitee | `https://ai.gitee.com/v1` | `Qwen2.5-72B-Instruct` | `GITEE_AI_API_KEY` |
+| C16 腾讯混元 | `https://api.hunyuan.cloud.tencent.com/v1` | `hunyuan-turbos-latest` | `HUNYUAN_API_KEY` |
+| C17 RWKV | （待填） | （待填） | `RWKV_API_KEY` |
+| C18 海螺 | `https://api.minimaxi.com/v1` | `MiniMax-M2` | `MINIMAX_API_KEY` |
+| C19 OpenCode | （待填） | （待填） | `OPENCODE_API_KEY` |
+| C20 GPT | `https://api.openai.com/v1` | `gpt-4o-mini` | `OPENAI_API_KEY` |
 
+GitLab、RWKV、OpenCode 没有统一的公开接口，`base_url`、`model` 留空，填上你自己的网关或本地部署地址就能接入（留空时一直本地模拟）。
 模型名按你实际开通的改。**设了哪个密钥，哪个选手就接真实模型；没设的继续本地模拟**（名牌上显示「模拟」），所以可以一个一个接：
 
 ```powershell

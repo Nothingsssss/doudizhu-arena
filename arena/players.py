@@ -12,19 +12,24 @@ class Player:
     sim = False   # True：没接真实接口，由本地机器人模拟出牌
 
     def __init__(self, name, avatar="", color="", voice_id="", id="", title="", voice_sim=None,
-                 cutout=False, **kw):
+                 cutout="auto", code="", art="full", face=None, **kw):
         self.name = name
         self.id = id or re.sub(r"\W+", "", name.lower()) or "player"
         self.title = title          # 形象名，如"鲸鱼女仆"，显示在名字下面
         self.voice_id = voice_id    # 真实语音接口的音色 ID（HeyGen / 自定义接口）
         self.voice_sim = voice_sim or {}   # 本地模拟语音：{"pitch": 1.4, "rate": 1.1, "voice": "Xiaoxiao"}
         self.avatar = avatar        # 立绘/头像图片，默认 static/avatars/<id>.png
-        self.cutout = bool(cutout)  # 图片是透明背景的抠图：大立绘不加边缘渐隐
+        self.code = code            # 形象编号，如 "C01"；头像文件也可以按编号命名
+        # 立绘背景处理："auto" 自动去掉纯色背景（白底立绘用）；true 已经是透明抠图；false 不处理，边缘渐隐
+        self.cutout = cutout
+        self.art = art              # "full" 全身立绘（牌桌上显示上半身）；"bust" 半身图（整张显示）
+        self.face = face            # 小头像裁剪位置 [脸中心x%, 脸中心y%, 框大小%]，按整张图算；不填自动找
         self.color = color          # 主题色，如 "#4f8cff"
         self.model = kw.get("model", "规则机器人" if kw.get("type") == "bot" else "")
 
     def profile(self):
-        return {"id": self.id, "title": self.title, "avatar": self.avatar, "cutout": self.cutout,
+        return {"id": self.id, "code": self.code, "title": self.title, "avatar": self.avatar,
+                "cutout": self.cutout, "art": self.art, "face": self.face,
                 "color": self.color, "model": self.model, "sim": self.sim, "voice_sim": self.voice_sim}
 
     def bid(self, view):
@@ -203,16 +208,17 @@ def make_player(cfg, simulate=None):
     if kind != "llm":
         raise ValueError(f"未知玩家类型: {kind}")
     has_key = cfg.get("api_key") or (cfg.get("api_key_env") and os.environ.get(cfg["api_key_env"]))
-    if has_key or _is_local(cfg.get("base_url")):
+    if cfg.get("base_url") and (has_key or _is_local(cfg.get("base_url"))):
         return LLMPlayer(**cfg)
     env = cfg.get("api_key_env") or "api_key"
-    print(f"[players] {cfg.get('name')}：没有设置 {env}，先用本地模拟出牌", flush=True)
+    why = f"没有设置 {env}" if cfg.get("base_url") else "还没填接口地址 base_url"
+    print(f"[players] {cfg.get('name')}：{why}，先用本地模拟出牌", flush=True)
     keep = {k: v for k, v in cfg.items() if k in SIM_KEEP}
     return simulate(keep) if simulate else BotPlayer(**keep)
 
 
 # 模拟玩家沿用的展示字段
-SIM_KEEP = ("name", "id", "title", "avatar", "cutout", "color", "voice_id", "voice_sim", "model")
+SIM_KEEP = ("name", "id", "code", "title", "avatar", "cutout", "art", "face", "color", "voice_id", "voice_sim", "model")
 
 
 __all__ = ["Player", "BotPlayer", "LLMPlayer", "make_player", "NAMES"]
