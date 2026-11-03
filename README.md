@@ -1,19 +1,22 @@
-# AI 斗地主擂台（直播用）
+# token争霸赛（斗地主直播）
 
-让多个大模型（任何 OpenAI 兼容接口）轮流打斗地主。桌上 3 人，其余排队，**每局淘汰一人**：
+让多个大模型（任何 OpenAI 兼容接口）打斗地主，**9 人积分淘汰制**决出冠军：
 
-- 地主输了：地主下场
-- 农民输了：剩牌多的农民下场
-  - 剩牌张数一样：剩余牌点数总和大的下场（2、王算大牌）
-  - 还一样：随机
-- 下场的人排到队尾，队首的人补位（`eliminate_forever: true` 则直接出局，打到只剩 3 人为止）
+- **9进6**：抽签分 A/B/C 三桌，每桌打 3 局，每桌积分最低的 1 人淘汰
+- **6进3**：分两桌，每桌打 3 局。两桌第一直接晋级；两桌第二比积分，高的晋级，其余淘汰
+- **决赛**：剩下 3 人打 3 局，积分最高的夺冠
+- 每轮积分清零重算；同分依次比胜局多、三局剩牌少、抽签
+- 下一轮按上一轮的位置顺序分桌，右侧流程图的连线不交叉
+- 冠军产生后歇一会儿，重新抽签开下一届，一直循环
+
+人数不是 9 也能跑（每轮保留 2/3，到 3 人打决赛）。想用以前的擂台轮换赛制，把 `arena.format` 改成 `"arena"`。
 
 纯 Python 标准库实现，不需要安装任何依赖（Python 3.9+）。
 
 ## 运行
 
 ```bash
-python server.py                            # config.json：22 个角色，没设密钥的先本地模拟
+python server.py                            # config.json：23 个角色，有立绘的 9 个参赛；没设密钥的先用规则机器人出牌
 python server.py --config config.demo.json  # 演示模式：保证 14 种牌型都打出来
 ```
 
@@ -22,17 +25,19 @@ python server.py --config config.demo.json  # 演示模式：保证 14 种牌型
 
 ## 直播画面
 
-国风金红主题，参考主流斗地主的布局：
+赛博朋克主题（青 / 品红 / 电黄霓虹）：
 
-- 顶部金色牌匾「AI斗地主擂台」，下面是局数、底牌、倍数
-- 三家都有大立绘：左上、右上两家，左下一家放大显示；名牌上有农民/地主徽章、积分、剩余张数
-- 背景是夜景古建筑、看台、灯笼、条幅，会不停放小烟花、飘火星
-- 牌桌是金边墨绿圆桌，带回纹、祥云、龙纹，边缘跑马灯跟着背景音乐闪
-- 轮到谁，谁的出牌位置出现金色闹钟计时（超过 15 秒变红抖动），立绘发光、手牌浮动
-- 剩 1~2 张时立绘旁亮起报警灯，进入危险模式（屏幕边缘红光、音乐提速）
-- 右侧：排行榜（金银铜奖牌）、排队上场（显示第几局上场）、实时战况（出牌用小牌面显示，王炸、炸弹高亮，正在思考的人实时计时），最下面一行是自动解说
+- 顶部霓虹标题「TOKEN争霸赛」，下面是第几届、当前轮次和桌号、本桌第几局、底牌、倍数
+- 三家都有大立绘：左上、右上两家，左下一家；名牌上有农民/地主徽章、本轮积分、剩余张数
+- 背景是赛博城市夜景、霓虹招牌、合成波落日和滚动的透视网格地面，整屏有淡淡的扫描线
+- 牌桌是全息圆桌，六边形网格、电路纹、HUD 刻度环，边缘跑马灯
+- 轮到谁，谁的出牌位置出现计时器（超过 15 秒变红），立绘发光、手牌发光
+- 剩 1~2 张时报警灯亮起，进入危险模式（屏幕边缘红光、音乐提速）
+- 右侧上方是**赛程流程图**：最上面冠军，往下决赛、6进3、9进6（三桌）。正在打的桌子亮黄框，每人头像下显示本轮积分；打完的桌子晋级亮青、待定亮黄、淘汰变灰打叉，晋级的人用自己的颜色连线到上一层
+- 右侧下方是实时战况（出牌用小牌面显示，正在思考的人实时计时）和自动解说
+- 每局结算显示本局得分和本轮累计；一桌打完盖「晋级 / 待定 / 淘汰」章；一轮打完显示晋级名单；决赛后显示冠军全身立绘和决赛排名
 - 三家手牌全部明牌（上帝视角）
-- 左上角是演示进度；鼠标移到左上角会出现语音 / 音乐 / 音效开关（地址加 `?controls=1` 一直显示）
+- 鼠标移到左上角会出现语音 / 音乐 / 音效开关（地址加 `?controls=1` 一直显示）
 
 ### 特效
 
@@ -62,7 +67,7 @@ python server.py --config config.demo.json  # 演示模式：保证 14 种牌型
 
 ## 头像和名字
 
-`config.json` 里每个选手有 `code`（形象编号 C01~C22）、`id`、`name`（显示名）、`title`（形象名）、`color`（主题色）。
+`config.json` 里每个选手有 `code`（形象编号 C01~C23）、`id`、`name`（显示名）、`title`（形象名）、`color`（主题色）。
 全身立绘放到 `static/avatars/<id>.png`，白底会自动去掉，详见 [static/avatars/README.md](static/avatars/README.md)。没放图的显示自动生成的徽章。
 
 ## Live2D 虚拟人（可选）
@@ -91,7 +96,7 @@ python server.py --config config.demo.json  # 演示模式：保证 14 种牌型
 | 选手 | 接口地址 | 模型 | 密钥环境变量 |
 |---|---|---|---|
 | C01 Claude | `https://api.anthropic.com/v1` | `claude-sonnet-4-5` | `ANTHROPIC_API_KEY` |
-| C02 DeepSeek | `https://api.deepseek.com/v1` | `deepseek-chat` | `DEEPSEEK_API_KEY` |
+| C02 DeepSeek | `https://api.deepseek.com/v1` | `deepseek-flash` | `DEEPSEEK_API_KEY` |
 | C03 Kimi | `https://api.moonshot.cn/v1` | `kimi-latest` | `MOONSHOT_API_KEY` |
 | C04 通义千问 | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-plus` | `DASHSCOPE_API_KEY` |
 | C05 GLM | `https://open.bigmodel.cn/api/paas/v4` | `glm-4-flash` | `ZHIPU_API_KEY` |
@@ -112,6 +117,7 @@ python server.py --config config.demo.json  # 演示模式：保证 14 种牌型
 | C20 GPT | `https://api.openai.com/v1` | `gpt-4o-mini` | `OPENAI_API_KEY` |
 | C21 小米 MiMo | `https://api.xiaomimimo.com/v1` | `mimo-v2.6-flash` | `MIMO_API_KEY` |
 | C22 阶跃星辰 | `https://api.stepfun.com/v1` | `step-3.7-flash` | `STEPFUN_API_KEY` |
+| C23 DeepSeek V4 Pro | `https://api.deepseek.com/v1` | `deepseek-v4-pro` | `DEEPSEEK_API_KEY` |
 
 GitLab、RWKV、OpenCode 没有统一的公开接口，`base_url`、`model` 留空，填上你自己的网关或本地部署地址就能接入（留空时一直本地模拟）。
 模型名按你实际开通的改。**设了哪个密钥，哪个选手就接真实模型；没设的继续本地模拟**（名牌上显示「模拟」），所以可以一个一个接：
@@ -189,30 +195,34 @@ python server.py --config config.demo.json     # 或者对任意配置加 --demo
 
 | 字段 | 默认 | 说明 |
 |---|---|---|
+| `format` | `"tournament"` | `"tournament"`：9 人积分淘汰；`"arena"`：旧的擂台轮换（每局淘汰一人） |
+| `entrants` | 9 | 参赛人数（取 3 的倍数），有立绘的角色多于这个数时每届随机抽 |
+| `games_per_table` | 3 | 每桌打几局 |
 | `move_delay` | 1.5 | 每手牌之间的停顿（秒），方便观众看 |
-| `game_pause` | 8 | 每局结束后的停顿（秒），显示谁下场 |
-| `eliminate_forever` | false | true：输的人直接出局，不再排队 |
+| `game_pause` | 8 | 每局结束后的停顿（秒），显示结算 |
+| `round_pause` | 12 | 每轮结束后的停顿（秒），显示晋级名单 |
+| `champion_pause` | 30 | 冠军画面停留多久（秒）再开下一届 |
 | `only_with_art` | true | 没有立绘的角色不上场（有立绘的不足 3 个时自动全部上场） |
 | `max_games` | null | 最多打几局，null 为一直打 |
 | `seed` | null | 随机种子，用于复现 |
-| `start_score` | 1000 | 初始积分 |
-| `score_unit` | 100 | 每 1 倍对应多少积分 |
 | `demo` | false | true 等于加 `--demo` |
+
+旧赛制（`format: "arena"`）另外支持 `eliminate_forever`、`start_score`、`score_unit`。
 
 ## 计分
 
-倍数 = 叫分（1~3），每个炸弹/王炸 ×2，春天/反春 ×2。地主赢得或输掉 倍数×2×`score_unit` 积分，农民各 倍数×`score_unit`。
-排行榜显示积分、胜负、当前连胜和最高连胜。
+倍数 = 叫分（1~3），每个炸弹/王炸 ×2，春天/反春 ×2。地主赢得或输掉 倍数×2 分，农民各 倍数×1 分（三家合计为 0）。
+每桌三局累加成本轮积分，用来排名次。
 
 ## 文件
 
 - `arena/cards.py`：牌型识别、大小比较、合法出法生成
 - `arena/players.py`：规则机器人、大模型玩家、提示词
-- `arena/game.py`：一局流程（叫分、出牌、春天）和擂台轮换
+- `arena/game.py`：一局流程（叫分、出牌、春天）、争霸赛赛程（`Tournament`）和旧的擂台轮换（`Arena`）
 - `arena/callout.py`：出牌播报词
 - `arena/voice.py`：语音（本地模拟 / HeyGen / 自定义接口）
 - `arena/demo.py`：演示模式
 - `server.py`：网页服务 + 实时推送（SSE）
 - `live2d/`：Live2D 模块源码（TypeScript）和官方 CubismWebFramework（submodule），`node live2d/build.mjs` 生成 `static/live2d/live2d.js`
 - `tools/live2d_prep.py`、`tools/fetch_live2d_samples.sh`：建模素材准备、下载官方示例模型
-- `static/`：直播画面（`index.html`、`style.css`、`app.js`、粒子引擎 `fx.js`、牌型动画 `combo.js`），`static/avatars/` 放立绘
+- `static/`：直播画面（`index.html`、`style.css`、赛博主题 `cyber.css`、`app.js`、粒子引擎 `fx.js`、牌型动画 `combo.js`），`static/avatars/` 放立绘

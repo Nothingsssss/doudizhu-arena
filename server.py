@@ -1,4 +1,4 @@
-"""启动擂台 + 直播网页。
+"""启动 token争霸赛 + 直播网页。
 
 用法：
     python server.py                     # 读取 config.json
@@ -14,7 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from arena.cards import NAMES
-from arena.game import Arena
+from arena.game import Arena, Tournament
 from arena.players import make_player
 from arena.voice import make_tts
 from arena.demo import Showcase, demo_players, wrap_emit
@@ -38,7 +38,7 @@ class Bus:
             if kind == "game_start":
                 self.current_game = []
             self.current_game.append(msg)
-            if kind in ("game_start", "game_end"):
+            if kind in ("game_start", "game_end", "round_start", "round_end", "champion"):
                 self.last_snapshot = msg
             for q in list(self.clients):
                 q.put(msg)
@@ -219,17 +219,29 @@ def main():
                 print(f"[avatar] 没有立绘、这次不上场：{'、'.join(skipped)}", flush=True)
         else:
             print("[avatar] 有立绘的角色不足 3 个，全部角色照常上场", flush=True)
-    arena = Arena(players, emit,
-                  move_delay=a.get("move_delay", 1.5),
-                  game_pause=a.get("game_pause", 8),
-                  eliminate_forever=a.get("eliminate_forever", False),
-                  seed=a.get("seed"),
-                  tts=make_tts(cfg.get("tts"), STATIC / "audio"),
-                  dealer=dealer,
-                  start_score=a.get("start_score", 1000),
-                  score_unit=a.get("score_unit", 100))
-    threading.Thread(target=arena.run_forever, kwargs={"max_games": a.get("max_games")},
-                     daemon=True).start()
+    tts = make_tts(cfg.get("tts"), STATIC / "audio")
+    if a.get("format", "tournament") == "tournament":
+        # 默认赛制：9 人积分淘汰（9进6 → 6进3 → 决赛）
+        arena = Tournament(players, emit,
+                           move_delay=a.get("move_delay", 1.5),
+                           game_pause=a.get("game_pause", 8),
+                           round_pause=a.get("round_pause", 12),
+                           champion_pause=a.get("champion_pause", 30),
+                           games_per_table=a.get("games_per_table", 3),
+                           entrants=a.get("entrants", 9),
+                           seed=a.get("seed"), tts=tts, dealer=dealer)
+        run = {"max_games": a.get("max_games"), "max_editions": a.get("max_editions")}
+    else:
+        # 旧赛制：擂台轮换，每局淘汰一人
+        arena = Arena(players, emit,
+                      move_delay=a.get("move_delay", 1.5),
+                      game_pause=a.get("game_pause", 8),
+                      eliminate_forever=a.get("eliminate_forever", False),
+                      seed=a.get("seed"), tts=tts, dealer=dealer,
+                      start_score=a.get("start_score", 1000),
+                      score_unit=a.get("score_unit", 100))
+        run = {"max_games": a.get("max_games")}
+    threading.Thread(target=arena.run_forever, kwargs=run, daemon=True).start()
 
     port = args.port or cfg.get("port", 8000)
     print(f"直播页面: http://localhost:{port}", flush=True)

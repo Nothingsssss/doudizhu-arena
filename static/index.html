@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AI 斗地主擂台</title>
+<title>token争霸赛</title>
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="cyber.css">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute">
@@ -38,12 +39,10 @@
 <div id="viewport">
 <div id="stage">
 <div id="cam">
-  <!-- 背景：夜空、古建筑、看台、灯笼、条幅 -->
+  <!-- 背景：赛博城市夜景 + 透视网格地面 + 扫描线 -->
   <div id="bg">
     <svg id="scene" viewBox="0 0 1920 1080" preserveAspectRatio="none"></svg>
-    <div class="banner b1"><i></i><span>播</span><em></em></div>
-    <div class="banner b2"><i></i><span>擂</span><em></em></div>
-    <div class="drape d1"></div><div class="drape d2"></div>
+    <div id="floor"><i></i></div>
     <div id="embers"></div>
     <div class="pulse"></div>
   </div>
@@ -74,12 +73,12 @@
     <div class="bubble" id="bubble2"></div>
   </main>
 
-  <!-- 顶部牌匾 -->
+  <!-- 顶部标题栏 -->
   <header id="plaque">
-    <svg class="wings" viewBox="0 0 900 200"></svg>
-    <div class="board"><div class="board-in"><div class="ptitle">AI斗地主擂台</div></div></div>
+    <div class="hud-title"><span class="glitch" data-t="TOKEN争霸赛">TOKEN争霸赛</span></div>
+    <div class="hud-sub"><i></i><span id="hudEdition">第 1 届</span><i></i><span id="hudRound">等待抽签</span><i></i></div>
     <div class="prow">
-      <div class="pchip"><span>第</span><b id="gameNo">-</b><span>局</span></div>
+      <div class="pchip"><span id="roundTag">第</span><b id="gameNo">-</b><span id="gameOf">局</span></div>
       <div class="pbottom"><label>底牌</label><div id="bottom"></div></div>
       <div class="pchip mult"><span>倍数</span><b id="mult">×1</b></div>
     </div>
@@ -92,21 +91,17 @@
     <button id="sound" class="tbtn" title="音效开关">音效</button>
   </div>
 
-  <!-- 右侧面板 -->
+  <!-- 右侧面板：赛程流程图 + 实时战况 -->
   <aside id="side">
-    <div class="panel p-rank">
-      <h3><i class="crown-ico"></i>排行榜<i class="crown-ico"></i></h3>
-      <div id="rank"></div>
-    </div>
-    <div class="panel p-queue">
-      <h3><i class="chev">»</i>排队上场<i class="chev">«</i></h3>
-      <div id="queue"></div>
+    <div class="panel p-bracket">
+      <h3><span>赛程</span><small id="bracketStage">9进6 · 6进3 · 决赛</small></h3>
+      <div id="bracket"></div>
     </div>
     <div class="panel p-feed">
-      <h3>实时战况<span class="onair"><i></i>直播中</span></h3>
+      <h3><span>实时战况</span><span class="onair"><i></i>LIVE</span></h3>
       <div id="feedHead"></div>
       <div id="feed"></div>
-      <div id="ticker"><i>⚡</i><span></span></div>
+      <div id="ticker"><i>▶</i><span></span></div>
     </div>
   </aside>
 

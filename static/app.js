@@ -19,7 +19,7 @@ const num = (n) => Number(n || 0).toLocaleString("en-US");
 
 /* ================= 状态 ================= */
 const G = {
-  live: false, profiles: {}, snap: null, gameNo: 0, bid: 0, mult: 1, landlord: -1, phase: "等待开局",
+  live: false, profiles: {}, snap: null, gameNo: 0, match: null, bracket: null, bid: 0, mult: 1, landlord: -1, phase: "等待开局",
   roles: [null, null, null], bottom: [], used: {}, turn: -1, endSeq: 0, think: null,
   seats: [0, 1, 2].map(() => ({ name: "", hand: [], played: null, label: "", kind: "", hot: false, thinking: false, t0: 0, alarmed: false, typing: null })),
 };
@@ -267,79 +267,74 @@ function hydrate(root) {
 new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) hydrate(n); })
   .observe(document.getElementById("stage"), { childList: true, subtree: true });
 
-/* ================= 场景（背景 / 牌桌 / 牌匾） ================= */
-function pagoda(cx, base, tiers, w, h) {
-  let s = "", y = base;
-  for (let k = 0; k < tiers; k++) {
-    const ww = w * (1 - k * 0.17), bh = h * (k ? 0.7 : 1);
-    s += `<rect x="${cx - ww * 0.36}" y="${y - bh}" width="${ww * 0.72}" height="${bh}" fill="url(#bld)"/>`;
-    for (let j = 0; j < 3; j++) s += `<rect x="${cx - ww * 0.27 + j * ww * 0.2}" y="${y - bh * 0.72}" width="${ww * 0.09}" height="${bh * 0.42}" rx="2" fill="#ffb84a" opacity=".5"/>`;
-    y -= bh;
-    const rw = ww * 0.62, rh = 20 + 8 * (tiers - k) / tiers;
-    s += `<path d="M${cx - rw - 28} ${y + 4} Q${cx - rw} ${y + 2} ${cx - rw + 14} ${y - 9} L${cx - rw * 0.55} ${y - rh} L${cx + rw * 0.55} ${y - rh} L${cx + rw - 14} ${y - 9} Q${cx + rw} ${y + 2} ${cx + rw + 28} ${y + 4} Z" fill="#0a1f2c" stroke="#2de2ff" stroke-width="2" stroke-opacity=".6"/>`;
-    y -= rh;
+/* ================= 场景（赛博城市 / 全息牌桌） ================= */
+const NEON = ["#3ee7ff", "#ff2bd6", "#fcee0a", "#7a5cff"];
+function skyline(seed, y, minH, maxH, w0, w1, fill, winOp) {
+  let s = "", x = -30, k = 0;
+  while (x < 1940) {
+    const w = w0 + (hash(seed + "w" + k) % (w1 - w0)), h = minH + (hash(seed + "h" + k) % (maxH - minH));
+    s += `<rect x="${x}" y="${y - h}" width="${w}" height="${h}" fill="${fill}"/>`;
+    // 窗户灯：一格一格的小亮点
+    for (let wy = y - h + 12; wy < y - 8; wy += 14) for (let wx = x + 6; wx < x + w - 6; wx += 12) {
+      const v = hash(seed + wx + "," + wy) % 100;
+      if (v < 16) s += `<rect x="${wx}" y="${wy}" width="5" height="3" fill="${NEON[v % 4]}" opacity="${winOp * (0.4 + (v % 5) / 8)}"/>`;
+    }
+    if (hash(seed + "a" + k) % 5 === 0) s += `<line x1="${x + w / 2}" y1="${y - h}" x2="${x + w / 2}" y2="${y - h - 30}" stroke="${fill}" stroke-width="3"/><circle cx="${x + w / 2}" cy="${y - h - 32}" r="3" fill="#ff2bd6" class="blink"/>`;
+    x += w + 4 + (hash(seed + "g" + k) % 10); k++;
   }
-  return s + `<path d="M${cx} ${y - 44} L${cx - 6} ${y} L${cx + 6} ${y} Z" fill="#e9b54a"/><circle cx="${cx}" cy="${y - 48}" r="5" fill="#ffd25a"/>`;
+  return s;
 }
 function buildScene() {
+  const H0 = 470;      // 地平线
   let stars = "";
-  for (let k = 0; k < 70; k++) stars += `<circle cx="${(hash("x" + k) % 1920)}" cy="${(hash("y" + k) % 300)}" r="${(k % 3) * 0.6 + 0.6}" fill="#fff" opacity="${0.2 + (k % 5) * 0.12}"/>`;
-  let city = "";
-  for (let x = -20; x < 1940; x += 46) { const hh = 40 + (hash("c" + x) % 90); city += `<rect x="${x}" y="${400 - hh}" width="40" height="${hh}" fill="#081a26"/>`; }
-  let lanterns = "", path = "M-20 70 Q 360 150 765 90 Q 1170 150 1560 70";
-  for (let k = 0; k <= 12; k++) {
-    const t = k / 12, x = -20 + t * 1580, y = 70 + Math.sin(t * Math.PI * 2) * -14 + 55 * Math.sin(t * Math.PI) - 10;
-    if (x > 360 && x < 1170 && y < 190) continue;   // 牌匾挡住的地方不画
-    lanterns += `<g transform="translate(${x.toFixed(0)},${y.toFixed(0)})"><line x1="0" y1="-8" x2="0" y2="4" stroke="#e9b54a" stroke-width="2"/>
-      <ellipse cx="0" cy="22" rx="17" ry="20" fill="url(#lan)"/><rect x="-9" y="2" width="18" height="5" fill="#e9b54a"/><rect x="-9" y="38" width="18" height="5" fill="#e9b54a"/>
-      <line x1="0" y1="43" x2="0" y2="58" stroke="#ffcf4a" stroke-width="3"/><ellipse cx="0" cy="22" rx="34" ry="34" fill="url(#lanGlow)"/></g>`;
-  }
+  for (let k = 0; k < 60; k++) stars += `<rect x="${hash("x" + k) % 1920}" y="${hash("y" + k) % 300}" width="2" height="2" fill="${k % 3 ? "#bfe8ff" : "#ffb3f0"}" opacity="${0.2 + (k % 5) * 0.12}"/>`;
+  let sunCut = "";
+  for (let k = 0; k < 8; k++) sunCut += `<rect x="0" y="${H0 - 150 + k * 22 + k * k * 0.8}" width="1920" height="${2 + k * 1.6}" fill="#000"/>`;
+  // 霓虹招牌
+  const sign = (x, y, w, h, c, t, fs, vert) => `<g filter="url(#neon)"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="rgba(5,2,20,.85)" stroke="${c}" stroke-width="3"/>
+    <text x="${x + w / 2}" y="${y + h / 2}" fill="${c}" font-size="${fs}" font-weight="900" text-anchor="middle" dominant-baseline="central" font-family="Arial Black, Microsoft YaHei, sans-serif" ${vert ? `writing-mode="tb" letter-spacing="6"` : `letter-spacing="4"`}>${t}</text></g>`;
   $("scene").innerHTML = `<defs>
-    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#040915"/><stop offset=".3" stop-color="#0a1c34"/><stop offset=".55" stop-color="#0d3343"/><stop offset="1" stop-color="#071c22"/></linearGradient>
-    <radialGradient id="warm" cx=".4" cy=".22" r=".5"><stop offset="0" stop-color="#ffb04a" stop-opacity=".35"/><stop offset="1" stop-color="#ffb04a" stop-opacity="0"/></radialGradient>
-    <radialGradient id="redGlow" cx=".4" cy="1" r=".6"><stop offset="0" stop-color="#ff3a1a" stop-opacity=".35"/><stop offset="1" stop-color="#ff3a1a" stop-opacity="0"/></radialGradient>
-    <linearGradient id="bld" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d2a3a"/><stop offset="1" stop-color="#06141c"/></linearGradient>
-    <radialGradient id="lan" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#ffe08a"/><stop offset=".35" stop-color="#ff3a2a"/><stop offset="1" stop-color="#8a0a10"/></radialGradient>
-    <radialGradient id="lanGlow"><stop offset="0" stop-color="#ff7a3a" stop-opacity=".45"/><stop offset="1" stop-color="#ff7a3a" stop-opacity="0"/></radialGradient>
-    <pattern id="crowd" width="16" height="13" patternUnits="userSpaceOnUse"><rect width="16" height="13" fill="#071722"/><circle cx="4" cy="5" r="3.6" fill="#0e2534"/><circle cx="12" cy="10" r="3.6" fill="#11293a"/><circle cx="12" cy="3" r=".9" fill="#7ff" opacity=".35"/></pattern>
-    <filter id="glow"><feGaussianBlur stdDeviation="4"/></filter>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#03010c"/><stop offset=".25" stop-color="#0b0526"/><stop offset=".40" stop-color="#25083f"/><stop offset=".435" stop-color="#5a0f5c"/><stop offset=".44" stop-color="#05020f"/><stop offset="1" stop-color="#020108"/></linearGradient>
+    <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fcee0a"/><stop offset=".45" stop-color="#ff7a3c"/><stop offset="1" stop-color="#ff2bd6"/></linearGradient>
+    <mask id="sunMask"><rect width="1920" height="1080" fill="#fff"/>${sunCut}</mask>
+    <radialGradient id="haze" cx=".4" cy=".43" r=".55"><stop offset="0" stop-color="#ff2bd6" stop-opacity=".38"/><stop offset=".5" stop-color="#7a5cff" stop-opacity=".12"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+    <filter id="neon" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="blur6"><feGaussianBlur stdDeviation="6"/></filter>
   </defs>
   <rect width="1920" height="1080" fill="url(#sky)"/>${stars}
-  <rect width="1920" height="1080" fill="url(#warm)"/>
-  ${city}
-  <ellipse cx="765" cy="690" rx="1180" ry="390" fill="url(#crowd)"/>
-  <ellipse cx="765" cy="690" rx="1180" ry="390" fill="none" stroke="#2de2ff" stroke-width="6" opacity=".35" filter="url(#glow)"/>
-  <ellipse cx="765" cy="690" rx="1180" ry="390" fill="none" stroke="#9ff6ff" stroke-width="2" opacity=".6"/>
-  <ellipse cx="765" cy="720" rx="1000" ry="300" fill="none" stroke="#2de2ff" stroke-width="2" opacity=".35" stroke-dasharray="30 14"/>
-  ${pagoda(330, 430, 3, 230, 64)}${pagoda(1200, 430, 3, 230, 64)}${pagoda(765, 330, 2, 300, 54)}
-  <path d="${path}" stroke="#3a1a08" stroke-width="2" fill="none"/>${lanterns}
-  <rect width="1920" height="1080" fill="url(#redGlow)"/>`;
+  <circle cx="765" cy="${H0 - 70}" r="250" fill="url(#sun)" mask="url(#sunMask)" opacity=".6"/>
+  <circle cx="765" cy="${H0 - 70}" r="270" fill="none" stroke="#ff2bd6" stroke-width="2" opacity=".25" filter="url(#blur6)"/>
+  <g opacity=".9">${skyline("far", H0, 60, 170, 40, 90, "#140a33", 0.6)}</g>
+  <g>${skyline("near", H0 + 4, 120, 330, 60, 140, "#07041a", 1)}</g>
+  ${sign(118, 150, 60, 200, "#ff2bd6", "争霸", 40, true)}${sign(1290, 120, 220, 64, "#3ee7ff", "TOKEN", 40)}${sign(1420, 230, 54, 170, "#fcee0a", "斗地主", 30, true)}${sign(250, 300, 170, 50, "#3ee7ff", "LIVE·24H", 26)}
+  <rect width="1920" height="1080" fill="url(#haze)"/>
+  <line x1="0" y1="${H0}" x2="1920" y2="${H0}" stroke="#ff2bd6" stroke-width="6" filter="url(#blur6)" opacity=".9"/>
+  <line x1="0" y1="${H0}" x2="1920" y2="${H0}" stroke="#ffd0f4" stroke-width="1.5"/>`;
 
-  // 牌桌：回纹圈 + 祥云 + 龙纹
-  const cloud = (x, y, s, flip) => `<path transform="translate(${x},${y}) scale(${flip ? -s : s},${s})" d="M0 0 q 18 -30 48 -12 q 18 -26 46 -2 q 32 -6 26 24 q -8 22 -40 12 q -20 20 -46 2 q -30 12 -34 -24 z M30 -2 q 10 -10 22 0 M70 4 q 8 -8 18 0" fill="none" stroke="#e6b54a" stroke-width="3" opacity=".45"/>`;
-  $("tableArt").innerHTML = `
-    <ellipse cx="745" cy="330" rx="640" ry="290" fill="none" stroke="#e6b54a" stroke-width="2" opacity=".35"/>
-    <ellipse cx="745" cy="330" rx="610" ry="270" fill="none" stroke="#e6b54a" stroke-width="10" opacity=".14" stroke-dasharray="14 8"/>
-    <ellipse cx="745" cy="340" rx="330" ry="150" fill="none" stroke="#ffd25a" stroke-width="3" opacity=".4"/>
-    <ellipse cx="745" cy="340" rx="300" ry="132" fill="none" stroke="#ffd25a" stroke-width="12" opacity=".14" stroke-dasharray="6 6 18 6"/>
-    <path d="M300 470 C 420 230, 620 560, 780 330 S 1040 160, 1190 400" fill="none" stroke="#e6b54a" stroke-width="30" opacity=".12" stroke-linecap="round"/>
-    <path d="M300 470 C 420 230, 620 560, 780 330 S 1040 160, 1190 400" fill="none" stroke="#ffd25a" stroke-width="46" opacity=".12" stroke-dasharray="3 13"/>
-    <path d="M1190 400 l 40 -30 l -8 34 l 34 6 l -44 22 Z" fill="#e6b54a" opacity=".22"/>
-    ${cloud(240, 250, 1.1)}${cloud(1250, 250, 1.1, true)}${cloud(330, 520, .9)}${cloud(1160, 520, .9, true)}
-    <text x="745" y="390" text-anchor="middle" font-size="150" font-weight="900" fill="#ffd25a" opacity=".1" font-family="KaiTi, STKaiti, serif">斗</text>`;
-
-  // 牌匾两侧的金色翅膀
-  let wing = "";
-  for (let k = 0; k < 6; k++) {
-    const bx = 196, by = 46 + k * 15, tx = 40 + k * 20, ty = 4 + k * 30;
-    wing += `<path d="M${bx} ${by} Q ${(bx + tx) / 2} ${ty - 16 + k * 4} ${tx} ${ty} Q ${(bx + tx) / 2 + 20} ${ty + 26} ${bx} ${by + 14} Z" fill="url(#gGold)" stroke="#6a3a08" stroke-width="2"/>`;
+  // 牌桌：全息 HUD 圆环 + 电路纹
+  let ticks = "";
+  for (let k = 0; k < 72; k++) {
+    const a = (k / 72) * Math.PI * 2, r1 = k % 6 ? 0.965 : 0.93;
+    ticks += `<line x1="${745 + Math.cos(a) * 640 * r1}" y1="${340 + Math.sin(a) * 300 * r1}" x2="${745 + Math.cos(a) * 640}" y2="${340 + Math.sin(a) * 300}" stroke="#3ee7ff" stroke-width="${k % 6 ? 1.5 : 3}" opacity=".45"/>`;
   }
-  $("plaque").querySelector(".wings").innerHTML = `<g>${wing}</g><g transform="translate(900,0) scale(-1,1)">${wing}</g>
-    <path d="M450 2 l 16 12 l -16 12 l -16 -12 Z" fill="#ff3a3a" stroke="#ffd25a" stroke-width="3"/>`;
+  const trace = (d, c) => `<path d="${d}" fill="none" stroke="${c}" stroke-width="2" opacity=".35"/>`;
+  const node = (x, y, c) => `<circle cx="${x}" cy="${y}" r="5" fill="none" stroke="${c}" stroke-width="2" opacity=".6"/>`;
+  $("tableArt").innerHTML = `
+    <defs><pattern id="hex" width="42" height="72.7" patternUnits="userSpaceOnUse" patternTransform="scale(.7)"><path d="M21 0 L42 12.1 L42 36.4 L21 48.5 L0 36.4 L0 12.1 Z M21 48.5 L21 72.7" fill="none" stroke="#3ee7ff" stroke-width="1.2" opacity=".14"/></pattern></defs>
+    <rect width="1490" height="700" fill="url(#hex)"/>
+    ${ticks}
+    <ellipse cx="745" cy="340" rx="600" ry="276" fill="none" stroke="#ff2bd6" stroke-width="2" opacity=".35" stroke-dasharray="40 10 4 10"/>
+    <ellipse cx="745" cy="340" rx="330" ry="150" fill="none" stroke="#3ee7ff" stroke-width="2.5" opacity=".45"/>
+    <ellipse cx="745" cy="340" rx="300" ry="134" fill="none" stroke="#3ee7ff" stroke-width="10" opacity=".1" stroke-dasharray="2 10"/>
+    ${trace("M120 340 H300 L340 300 H430", "#3ee7ff")}${trace("M1370 340 H1190 L1150 380 H1060", "#3ee7ff")}
+    ${trace("M260 180 L360 230 H470", "#ff2bd6")}${trace("M1230 500 L1130 450 H1020", "#ff2bd6")}
+    ${trace("M745 40 V120 M745 560 V640", "#fcee0a")}
+    ${node(430, 300, "#3ee7ff")}${node(1060, 380, "#3ee7ff")}${node(470, 230, "#ff2bd6")}${node(1020, 450, "#ff2bd6")}
+    <text x="745" y="372" text-anchor="middle" font-size="120" font-weight="900" fill="#3ee7ff" opacity=".07" letter-spacing="18" font-family="Arial Black, sans-serif">TOKEN</text>`;
 
-  // 漂浮的火星
+  // 漂浮的数据粒子
   let em = "";
-  for (let k = 0; k < 36; k++) em += `<i style="left:${(hash("e" + k) % 1520)}px;--s:${2 + (k % 4)}px;--d:${7 + (k % 7)}s;--dl:-${(k * 0.7) % 9}s;--x:${(k % 2 ? 1 : -1) * (40 + (k * 13) % 120)}px"></i>`;
+  for (let k = 0; k < 40; k++) em += `<i style="left:${(hash("e" + k) % 1520)}px;--s:${2 + (k % 3)}px;--d:${8 + (k % 7)}s;--dl:-${(k * 0.7) % 9}s;--x:${(k % 2 ? 1 : -1) * (20 + (k * 13) % 80)}px;--c:${NEON[k % 3]}"></i>`;
   $("embers").innerHTML = em;
 }
 
@@ -383,9 +378,9 @@ function buildSeat(i) {
       ${p.faces ? `<div class="expr"><i></i></div>` : ""}
       <div class="pstack">
         <div class="prole"><div class="role wait"><span>叫分中</span></div><span class="stk"></span></div>
-        <div class="nameplate"><span class="chip">AI</span><b class="name">${esc(s.name || "等待入座")}</b></div>
+        <div class="nameplate"><span class="chip">P${i + 1}</span><b class="name">${esc(s.name || "等待入座")}</b></div>
         <div class="subrow"><div class="scoreplate">积分 <b class="score">0</b></div><div class="countplate"><i class="cb"></i><b class="cnt">0</b>张</div></div>
-        <div class="modelline">${meta}${p.sim ? `<span class="simtag">模拟</span>` : ""}</div>
+        <div class="modelline">${meta}</div>
       </div>
     </div>
     <div class="hand"></div>`;
@@ -450,9 +445,14 @@ function splitSay(say) {
 
 /* ================= 牌匾 / 侧栏 ================= */
 function setTop() {
-  $("gameNo").textContent = G.gameNo || "-";
+  const m = G.match;
+  $("gameNo").textContent = m ? m.game : G.gameNo || "-";
+  $("gameOf").textContent = m ? `/${m.of} 局` : "局";
   $("mult").textContent = "×" + G.mult;
-  $("feedHead").textContent = G.gameNo ? `第${G.gameNo}局 ${G.phase}（倍数×${G.mult}）` : "等待开局";
+  const b = G.bracket;
+  $("hudEdition").textContent = `第 ${(b && b.edition) || 1} 届`;
+  $("hudRound").textContent = m ? (m.round_name === "决赛" ? "决赛 · 3进1" : `${m.round_name} · ${LETTER[m.table]}桌`) : b && b.champion ? "冠军诞生" : "等待抽签";
+  $("feedHead").textContent = m ? `${matchLabel(m)} · ${G.phase}（倍数×${G.mult}）` : G.gameNo ? `第${G.gameNo}局 ${G.phase}` : "等待开局";
 }
 function setMult(m) {
   if (m === G.mult) return;
@@ -473,26 +473,93 @@ function setMult(m) {
 function setPhase(t) { G.phase = t; $("phase").textContent = t; setTop(); }
 function setHint(t) { $("turnHint").textContent = t || ""; }
 
-function medal(n) {
-  const c = [["#fff3b0", "#ffc21a", "#8a5000"], ["#ffffff", "#c9d2e0", "#5a6580"], ["#ffd8b0", "#d9813a", "#6a2a08"]][n - 1];
-  return `<svg class="medal" viewBox="0 0 40 40"><path d="M9 0 L17 15 L23 15 L31 0 Z" fill="#d4202a" stroke="#7a0a10" stroke-width="1"/><circle cx="20" cy="25" r="14" fill="${c[1]}" stroke="${c[2]}" stroke-width="2.5"/>
-    <circle cx="20" cy="25" r="10" fill="none" stroke="${c[0]}" stroke-width="1.5"/><text x="20" y="31" font-size="16" font-weight="900" text-anchor="middle" fill="${c[2]}" font-family="Arial Black, sans-serif">${n}</text></svg>`;
+/* ================= 赛程流程图 =================
+ * 最上面冠军，往下是决赛、6进3、9进6（9 人分 3 桌）。
+ * 每桌打完：晋级的亮青色、待定的黄色、淘汰的变灰；晋级的人用各自颜色的线连到上一层的位置。 */
+const LETTER = "ABCDEFGHI";
+const nextSize = (n) => (n <= 3 ? 1 : Math.max(3, Math.floor(Math.floor((n * 2) / 3) / 3) * 3));
+const roundName = (n) => (n <= 3 ? "决赛" : `${n}进${nextSize(n)}`);
+const signed = (v) => (v > 0 ? "+" : "") + v;
+function curTable(b) { const m = b && b.match; return m && b.rounds[m.round] ? b.rounds[m.round].tables[m.table] : null; }
+function renderBracket(snap) {
+  const b = snap && snap.bracket;
+  if (!b) return;
+  G.bracket = b;
+  const plan = b.plan && b.plan.length ? b.plan : [9, 6, 3, 1];
+  const m = b.match;
+  const live = snap.stats || {};
+  const rows = [];
+  for (let r = plan.length - 2; r >= 0; r--) {
+    const rd = b.rounds[r], n = plan[r];
+    const tables = rd ? rd.tables : Array.from({ length: Math.ceil(n / 3) }, () => ({ players: [null, null, null], games: 0, done: false }));
+    const groups = tables.map((t, ti) => {
+      const isLive = m && m.round === r && m.table === ti;
+      const slots = t.players.map((name) => {
+        if (!name) return `<div class="bs st-empty"><div class="mini q">?</div><b class="bsc">&nbsp;</b></div>`;
+        let st = "";
+        if (t.done) st = (t.advance || []).includes(name) ? "adv" : (t.pending || []).includes(name) ? "pend" : "out";
+        else if (isLive) st = "cur";
+        const sc = isLive && live[name] ? live[name].score : (t.scores || {})[name] ?? 0;
+        const showSc = t.games > 0 || isLive;
+        return `<div class="bs st-${st || "wait"}" data-n="${esc(name)}" data-r="${r}" style="${pcVars(name)}">${mini(name)}${n <= 3 ? `<span class="bnm">${esc(name)}</span>` : ""}<b class="bsc${showSc && sc < 0 ? " neg" : ""}">${showSc ? signed(sc) : "&nbsp;"}</b></div>`;
+      }).join("");
+      const tag = n <= 3 ? "决赛桌" : `${LETTER[ti]}桌`;
+      const prog = t.done ? "完赛" : isLive ? `第${m.game}/${m.of}局` : t.games ? `${t.games}/${b.games_per_table || 3}` : "待赛";
+      return `<div class="bg${isLive ? " live" : ""}${t.done ? " done" : ""}"><div class="bgh"><span>${tag}</span><em>${prog}</em></div><div class="bgs">${slots}</div></div>`;
+    }).join("");
+    const cls = n <= 3 ? "r-final" : n <= 6 ? "r-mid" : "r-first";
+    rows.push(`<div class="bk-row ${cls}" data-r="${r}"><div class="bk-lab"><b>${roundName(n)}</b></div><div class="bk-groups">${groups}</div></div>`);
+  }
+  const ch = b.champion;
+  const champ = `<div class="bk-row r-champ"><div class="bk-champ${ch ? " on" : ""}"${ch ? ` style="${pcVars(ch)}"` : ""}>
+      ${CROWN}${ch ? mini(ch) : `<div class="mini q">?</div>`}<span class="bnm">${ch ? esc(ch) : "冠军"}</span></div></div>`;
+  $("bracket").innerHTML = `<div class="bk"><svg class="bk-lines"></svg>${champ}${rows.join("")}</div>`;
+  $("bracketStage").textContent = `第 ${b.edition || 1} 届 · ${m ? `${m.round_name} 进行中` : ch ? "冠军诞生" : "抽签完成"}`;
+  requestAnimationFrame(() => drawBracketLines(b, plan));
 }
-function renderBoard(snap, ended) {
-  if (!snap) return;
-  const onTable = new Set(snap.table || []);
-  const rows = Object.entries(snap.stats || {}).sort((a, b) => b[1].score - a[1].score || b[1].wins - a[1].wins).slice(0, 5);
-  $("rank").innerHTML = rows.map(([n, s], idx) => `
-    <div class="rk${idx === 0 ? " r1" : ""}${onTable.has(n) ? " on" : ""}">
-      ${idx < 3 ? medal(idx + 1) : `<span class="no">${idx + 1}</span>`}${mini(n)}
-      <div class="nm">${esc(n)}<small>${s.wins}胜${s.losses}负${s.streak >= 2 ? ` · ${s.streak}连胜` : ""}</small></div>
-      <div class="sc">积分<b class="${s.score < 0 ? "neg" : ""}">${num(s.score)}</b></div>
-    </div>`).join("");
-  const q = snap.queue || [], out = snap.out || [], base = (snap.game_no || 0) + (ended ? 2 : 1);
-  const circled = (i) => "①②③④⑤⑥⑦⑧⑨⑩"[i] || i + 1;
-  $("queue").innerHTML = (q.length ? q.slice(0, 3).map((n, i) => `<div class="q${i === 0 ? " next" : ""}"><span class="qn">${circled(i)}</span>${mini(n)}<span class="nm">${esc(n)}</span>
-      <span class="when">(${base + i === G.gameNo + 1 ? "下局上场" : `第${base + i}局上场`})</span></div>`).join("") : `<div class="empty">暂无挑战者</div>`) +
-    out.slice(0, 2).map((n) => `<div class="q gone">${mini(n)}<span class="nm">${esc(n)}</span><span class="when">已出局</span></div>`).join("");
+function relPos(el, root) {
+  let x = 0, y = 0, e = el;
+  while (e && e !== root) { x += e.offsetLeft; y += e.offsetTop; e = e.offsetParent; }
+  return { x, y, w: el.offsetWidth, h: el.offsetHeight };
+}
+function drawBracketLines(b, plan) {
+  const root = $("bracket").querySelector(".bk"), svg = root && root.querySelector(".bk-lines");
+  if (!svg) return;
+  const W = root.offsetWidth, Hh = root.offsetHeight;
+  svg.setAttribute("viewBox", `0 0 ${W} ${Hh}`); svg.setAttribute("width", W); svg.setAttribute("height", Hh);
+  const rowEl = (r) => root.querySelector(`.bk-row[data-r="${r}"]`);
+  const champEl = root.querySelector(".bk-champ");
+  let out = "";
+  // 骨架：每层的桌子向上汇到一条总线，再连到上一层
+  for (let r = 0; r < plan.length - 1; r++) {
+    const lo = rowEl(r), hiGroups = r + 1 < plan.length - 1 ? [...rowEl(r + 1).querySelectorAll(".bg")] : [champEl];
+    if (!lo) continue;
+    const loG = [...lo.querySelectorAll(".bg")].map((g) => relPos(g, root)), hiG = hiGroups.map((g) => relPos(g, root));
+    const top = Math.min(...loG.map((g) => g.y)), bot = Math.max(...hiG.map((g) => g.y + g.h));
+    const bus = (top + bot) / 2;
+    const xs = loG.concat(hiG).map((g) => g.x + g.w / 2);
+    out += `<path class="sk" d="M${Math.min(...xs)} ${bus} H${Math.max(...xs)}"/>`;
+    loG.forEach((g) => (out += `<path class="sk" d="M${g.x + g.w / 2} ${g.y} V${bus}"/>`));
+    hiG.forEach((g) => (out += `<path class="sk" d="M${g.x + g.w / 2} ${g.y + g.h} V${bus}"/>`));
+    // 晋级的人：从自己的格子连到上一层的格子
+    const rd = b.rounds[r];
+    if (!rd) continue;
+    rd.tables.forEach((t) => (t.advance || []).forEach((name) => {
+      const a = lo.querySelector(`.bs[data-n="${CSS.escape(name)}"]`);
+      if (!a) return;
+      const pa = relPos(a, root), x1 = pa.x + pa.w / 2, y1 = pa.y;
+      let x2, y2;
+      if (r + 1 < plan.length - 1) {
+        const hiRow = rowEl(r + 1), bEl = hiRow && hiRow.querySelector(`.bs[data-n="${CSS.escape(name)}"]`);
+        if (bEl) { const pb = relPos(bEl, root); x2 = pb.x + pb.w / 2; y2 = pb.y + pb.h; }
+      } else if (b.champion === name) { const pc = relPos(champEl, root); x2 = pc.x + pc.w / 2; y2 = pc.y + pc.h; }
+      const c = colorOf(name);
+      if (x2 === undefined) { out += `<path class="fl" style="stroke:${c}" d="M${x1} ${y1} V${bus}"/>`; return; }
+      const my = (y1 + y2) / 2;
+      out += `<path class="fl" style="stroke:${c}" d="M${x1} ${y1} C${x1} ${my} ${x2} ${my} ${x2} ${y2}"/>`;
+    }));
+  }
+  svg.innerHTML = out;
 }
 
 /* ================= 实时战况 ================= */
@@ -523,10 +590,10 @@ function ticker(text, hot) {
 }
 
 /* ================= 特效 ================= */
-const GOLD = ["#fff6c0", "#ffd36b", "#ff9f43", "#ffffff"];
+const GOLD = ["#ffffff", "#fcee0a", "#3ee7ff", "#ff2bd6"];
 const FIRE = ["#fff6c0", "#ffd36b", "#ff9a1f", "#ff5a1f", "#ff2d2d"];
 const RAINBOW = ["#ff3d6e", "#ffcf3d", "#3dffb4", "#3dc8ff", "#b93dff", "#ffffff"];
-const FESTIVE = ["#fff6c0", "#ffd36b", "#ff5a3a", "#ff2d6a", "#ffb020", "#ffffff"];
+const FESTIVE = ["#ffffff", "#fcee0a", "#3ee7ff", "#ff2bd6", "#7a5cff", "#6dffb0"];
 const CYAN = ["#e8fbff", "#3ee7ff", "#3d7bff", "#8b5cff"];
 const CENTER = { x: 765, y: 520 };
 function fxAdd(el, ms) { $("fx").appendChild(el); setTimeout(() => el.remove(), ms); return el; }
@@ -710,13 +777,17 @@ function fxAlarm(seat, left) {
   later(200, () => sfx("siren"));
 }
 
-function fxStart(no) {
+function matchLabel(m) {
+  if (!m) return "";
+  return m.round_name === "决赛" ? `决赛 第${m.game}/${m.of}局` : `${m.round_name} · ${LETTER[m.table]}桌 第${m.game}/${m.of}局`;
+}
+function fxStart(m) {
   if (!G.live) return;
-  big(`第 ${no} 局`, "start", 1300); sfx("start");
+  big(m ? matchLabel(m) : "开局", "start", 1300); sfx("start");
   later(1050, () => {
-    big("开战", "fight", 1200);
-    FX.ring(CENTER.x, CENTER.y, { c: "#ffd36b", vr: 1600, w: 12 });
-    FX.glitter(CENTER.x, CENTER.y, { n: 80, colors: GOLD.concat("#ff4d6d"), speed: [150, 700], g: 200 });
+    big(m && m.round_name === "决赛" && m.game === m.of ? "冠军局" : "开战", "fight", 1200);
+    FX.ring(CENTER.x, CENTER.y, { c: "#3ee7ff", vr: 1600, w: 12 });
+    FX.glitter(CENTER.x, CENTER.y, { n: 80, colors: GOLD.concat("#ff2bd6"), speed: [150, 700], g: 200 });
     sfx("fight");
   });
 }
@@ -856,72 +927,124 @@ async function showResult(d) {
   const names = G.seats.map((s) => s.name);
   const ov = $("overlay");
   const lordWin = d.winner_side === "地主";
-  const loserIdx = names.indexOf(d.loser);
+  const m = d.match || {}, st = d.stats || {};
+  const isFinal = m.round_name === "决赛";
+  const tb = d.bracket && d.bracket.rounds[m.round] ? d.bracket.rounds[m.round].tables[m.table] : null;
+  const rank = (tb && tb.ranking) || [];
   const cards = names.map((n, i) => {
     const role = d.roles[i], win = role === d.winner_side;
     const delta = d.deltas ? d.deltas[i] : (win ? 1 : -1) * d.multiplier * (role === "地主" ? 2 : 1);
-    return `<div class="rc${win ? " win" : ""}${i === loserIdx ? " loser" : ""}${role === "地主" ? " landlord" : ""}" style="--i:${i};${pcVars(n)}">
+    const sc = st[n] ? st[n].score : 0;
+    return `<div class="rc${win ? " win" : ""}${role === "地主" ? " landlord" : ""}" data-n="${esc(n)}" style="--i:${i};${pcVars(n)}">
       ${mini(n)}
       <div class="nm">${esc(n)}</div>
       <div class="rl"><span class="role ${role === "地主" ? "dz" : "nm"}"><span>${role}</span></span></div>
-      <div class="delta ${delta > 0 ? "pos" : "neg"}">${delta > 0 ? "+" : ""}${num(delta)}</div>
+      <div class="delta ${delta > 0 ? "pos" : "neg"}">${signed(delta)}</div>
+      <div class="tot">本轮积分 <b class="${sc < 0 ? "neg" : ""}">${signed(sc)}</b>${rank.length ? ` · 第${rank.indexOf(n) + 1}名` : ""}</div>
       <div class="left">剩余 ${d.hands_left[i].length} 张</div>
     </div>`;
   }).join("");
-  const sub = [`倍数 <b>×${d.multiplier}</b>`];
+  const sub = [matchLabel(m), `倍数 <b>×${d.multiplier}</b>`];
   if (d.bombs) sub.push(`炸弹 <b>${d.bombs}</b> 个`);
   if (d.spring) sub.push(`<b>${lordWin ? "春天" : "反春"}</b>`);
   ov.innerHTML = `<div class="res-title${lordWin ? "" : " farmer"}">${lordWin ? "地主胜利" : "农民胜利"}</div>
     <div class="res-sub">${sub.join(" · ")}</div>
     <div class="res-cards">${cards}</div>
-    <div class="res-reason"></div><div id="resNext"></div>`;
+    <div class="res-reason"></div><div class="res-reason2"></div>`;
   ov.classList.add("show");
 
-  const stampLoser = () => {
-    const rc = ov.querySelectorAll(".rc")[loserIdx];
-    if (rc) { rc.classList.add("stamped"); rc.insertAdjacentHTML("beforeend", `<div class="stamp">淘汰</div>`); }
-    ov.querySelector(".res-reason").textContent = `${d.loser} 下场 · ${d.reason}`;
-    return rc;
+  const reason = ov.querySelector(".res-reason"), reason2 = ov.querySelector(".res-reason2");
+  const left = (m.of || 3) - (m.game || 0);
+  const stampAll = () => {
+    const marks = [];
+    (d.eliminated || []).forEach((n) => marks.push([n, "淘汰", "out"]));
+    (d.pending || []).forEach((n) => marks.push([n, "待定", "pend"]));
+    (d.advanced || []).forEach((n) => marks.push([n, isFinal ? "冠军" : "晋级", isFinal ? "champ" : "adv"]));
+    const po = d.playoff;
+    if (po) {   // 最后一桌打完：两桌第二比积分，本桌的待定直接出结果
+      for (const mk of marks) if (mk[2] === "pend") mk.splice(1, 2, po.advanced.includes(mk[0]) ? "晋级" : "淘汰", po.advanced.includes(mk[0]) ? "adv" : "out");
+    }
+    for (const [n, text, cls] of marks) {
+      const rc = ov.querySelector(`.rc[data-n="${CSS.escape(n)}"]`);
+      if (!rc) continue;
+      rc.classList.add("stamped", "s-" + cls);
+      rc.insertAdjacentHTML("beforeend", `<div class="stamp ${cls}">${text}</div>`);
+    }
+    const tag = isFinal ? "决赛" : `${LETTER[m.table]}桌`;
+    if (isFinal) reason.textContent = `决赛战罢：${(d.advanced || []).join("、")} 积分第一，夺得冠军！`;
+    else {
+      const parts = [`${tag}战罢：${(d.advanced || []).join("、")} 晋级`];
+      if ((d.pending || []).length && !po) parts.push(`${d.pending.join("、")} 待定（和另一桌的第二名比积分）`);
+      const outs = (d.eliminated || []);
+      if (outs.length) parts.push(`${outs.join("、")} 淘汰`);
+      reason.textContent = parts.join("，");
+    }
+    if (po) reason2.textContent = `第二名对比：${po.advanced.join("、")} 晋级，${po.eliminated.join("、")} 淘汰`;
+    return marks;
   };
-  const showNext = () => {
-    if (!d.newcomer) return null;
-    $("resNext").innerHTML = `<div class="res-next" style="${pcVars(d.newcomer)}">${mini(d.newcomer)}<div><small>挑战者登场</small>${esc(d.newcomer)}</div></div>`;
-    return $("resNext").firstElementChild;
-  };
-  if (!G.live) { stampLoser(); showNext(); return; }
+  if (!d.table_done) {
+    reason.textContent = left > 0 ? `本桌还剩 ${left} 局 · ${isFinal ? "三局打完积分最高的夺冠" : "三局打完积分最低的淘汰"}` : "";
+  }
+  if (!G.live) { if (d.table_done) stampAll(); return; }
 
-  const winCols = lordWin ? GOLD : ["#cfe4ff", "#6fb0ff", "#ffffff", "#ffd36b"];
+  const winCols = lordWin ? GOLD : ["#cfe4ff", "#3ee7ff", "#ffffff", "#ff2bd6"];
   sfx("win");
-  FX.flash("rgba(255,255,255,.4)", 400);
-  FX.confetti(0, 1080, { dir: -1.0, spread: 0.7, n: 180 });
-  FX.confetti(1920, 1080, { dir: -2.14, spread: 0.7, n: 180 });
-  for (let k = 0; k < 6; k++) later(150 + k * 260, () => { FX.firework(FX.rnd(300, 1620), FX.rnd(130, 380), winCols); sfx("pop"); });
-  later(500, () => FX.rain({ n: 120 }));
+  FX.flash("rgba(255,255,255,.35)", 400);
+  FX.confetti(0, 1080, { dir: -1.0, spread: 0.7, n: 140 });
+  FX.confetti(1920, 1080, { dir: -2.14, spread: 0.7, n: 140 });
+  for (let k = 0; k < 4; k++) later(150 + k * 260, () => { FX.firework(FX.rnd(300, 1620), FX.rnd(130, 380), winCols); sfx("pop"); });
   if (d.spring) later(300, () => { big(lordWin ? "春天" : "反春", "spring", 2200); petals(90); });
+  if (!d.table_done) return;
 
   await wait(1700); if (seq !== G.endSeq) return;
-  const rc = stampLoser(); sfx("out");
-  if (rc) {
+  const marks = stampAll();
+  if (marks.some((x) => x[2] === "out")) sfx("out");
+  for (const [n, , cls] of marks) {
+    const rc = ov.querySelector(`.rc[data-n="${CSS.escape(n)}"]`);
+    if (!rc) continue;
     const p = FX.at(rc);
-    FX.flash("radial-gradient(circle, rgba(255,30,60,.55), transparent 70%)", 600);
-    FX.ring(p.x, p.y, { c: "#ff2d4a", vr: 1800, w: 20, life: 0.7 });
-    FX.burst(p.x, p.y, { n: 50, colors: ["#ff2d4a", "#ff8095", "#ffffff"], speed: [200, 700], g: 400 });
+    const c = cls === "out" ? "#ff2d4a" : cls === "pend" ? "#fcee0a" : "#3ee7ff";
+    FX.ring(p.x, p.y, { c, vr: 1400, w: 14, life: 0.7 });
+    FX.burst(p.x, p.y, { n: 50, colors: [c, "#ffffff"], speed: [200, 700], g: 300 });
   }
-  await wait(1500); if (seq !== G.endSeq) return;
-  const nx = showNext();
-  if (nx) {
-    sfx("next");
-    const p = FX.at(nx);
-    FX.beam(p.x, p.y, "rgba(62,231,255,.8)", 1500);
-    FX.ring(p.x, p.y, { c: "#3ee7ff", vr: 1400, w: 14 });
-    FX.burst(p.x, p.y, { n: 110, colors: CYAN, speed: [300, 1200], g: 200 });
-    FX.glitter(p.x, p.y, { n: 60, colors: CYAN });
-  }
+  if (marks.some((x) => x[2] !== "out")) later(500, () => sfx("next"));
 }
+
+// 一轮打完：晋级名单
+function showRoundEnd(d) {
+  const b = d.bracket, rd = b && b.rounds[b.rounds.length - 1];
+  if (!rd) return;
+  const ov = $("overlay"), st = d.stats || {};
+  const adv = rd.advance || [], outs = rd.tables.flatMap((t) => t.out || []);
+  const title = rd.target === 3 ? "决赛圈诞生" : `${rd.target}强诞生`;
+  ov.innerHTML = `<div class="res-title">${title}</div>
+    <div class="res-sub">第 ${b.edition} 届 token争霸赛 · ${rd.name} 结束</div>
+    <div class="res-cards adv">${adv.map((n, i) => `<div class="rc win" style="--i:${i};${pcVars(n)}">${mini(n)}<div class="nm">${esc(n)}</div>
+      <div class="tot">本轮积分 <b class="${(st[n] || {}).score < 0 ? "neg" : ""}">${signed((st[n] || {}).score || 0)}</b></div><div class="stamp adv">晋级</div></div>`).join("")}</div>
+    <div class="res-outs">${outs.map((n) => `<span style="${pcVars(n)}">${mini(n)}${esc(n)}</span>`).join("")}<em>止步${rd.name}</em></div>`;
+  ov.classList.add("show");
+  if (!G.live) return;
+  sfx("next");
+  big(title, "lord", 1800);
+  FX.confetti(0, 1080, { dir: -1.0, n: 160 }); FX.confetti(1920, 1080, { dir: -2.14, n: 160 });
+}
+
 function showChampion(d) {
-  const ov = $("overlay");
-  ov.innerHTML = `<div class="res-title">最终赢家</div><div class="res-sub">擂台赛结束</div>
-    <div class="res-cards">${d.names.map((n, i) => `<div class="rc win" style="--i:${i};${pcVars(n)}">${mini(n)}<div class="nm">${esc(n)}</div></div>`).join("")}</div>`;
+  const ov = $("overlay"), name = (d.names || [])[0], b = d.bracket || {};
+  if (!name) return;
+  const p = prof(name), st = d.stats || {};
+  const final = (d.final || []).map((n, i) => `<div class="fr${i === 0 ? " first" : ""}" style="${pcVars(n)}"><i>${i + 1}</i>${mini(n)}<span>${esc(n)}</span><b>${signed((st[n] || {}).score || 0)}</b></div>`).join("");
+  ov.innerHTML = `<div class="champ" style="${pcVars(name)}">
+      <div class="champ-art">${p.avatar ? `<img data-art="${esc(p.avatar)}" data-name="${esc(name)}" alt="">` : mini(name)}</div>
+      <div class="champ-info">
+        <div class="champ-ed">第 ${b.edition || 1} 届 token争霸赛</div>
+        <div class="res-title">冠军</div>
+        <div class="champ-name">${esc(name)}</div>
+        <div class="champ-meta">${esc([p.title, p.model].filter(Boolean).join(" · "))}</div>
+        <div class="champ-final">${final}</div>
+        <div class="champ-next">下一届即将抽签</div>
+      </div>
+    </div>`;
   ov.classList.add("show");
   if (!G.live) return;
   sfx("win");
@@ -944,18 +1067,35 @@ const H = {
 
   game_start(d) {
     G.endSeq++; $("overlay").classList.remove("show");
-    G.snap = d; G.profiles = d.profiles || G.profiles; G.gameNo = d.game_no;
+    G.snap = d; G.profiles = d.profiles || G.profiles; G.gameNo = d.game_no; G.match = d.match || null;
     G.bid = 0; G.mult = 1; G.landlord = -1; G.turn = -1; G.roles = [null, null, null];
     d.table.forEach((n, i) => Object.assign(G.seats[i], { name: n, hand: [], played: null, thinking: false, alarmed: false }));
     for (let i = 0; i < 3; i++) { buildSeat(i); renderPlayed(i); showClock(i, false); setExpr(i, 0, 0); cutinPrepare(G.seats[i].name); }
     l2dRetain();
     hideBubbles(); stopVoice(); setPhase("叫地主"); setHint("");
     $("bottom").innerHTML = cardsHtml([{ back: 1 }, { back: 1 }, { back: 1 }], 3, "sz-xs");
-    renderBoard(d, false); renderAllSeats();
+    renderBracket(d); renderAllSeats();
     $("feed").innerHTML = "";
-    feed(null, `第 ${d.game_no} 局开始：${d.table.join(" / ")}`);
-    ticker(`第 ${d.game_no} 局开战！输的人要下场，谁会被淘汰？`);
-    FX.danger(false); fxStart(d.game_no);
+    const m = G.match;
+    feed(null, `${m ? matchLabel(m) : `第 ${d.game_no} 局`}：${d.table.join(" / ")}`);
+    if (!m) ticker(`第 ${d.game_no} 局开战！`);
+    else if (m.round_name === "决赛") ticker(`决赛第 ${m.game}/${m.of} 局！三局积分最高的夺冠`);
+    else if (m.round_name === "6进3") ticker(`${matchLabel(m)} 开战！桌首晋级，第二待定，末位淘汰`);
+    else ticker(`${matchLabel(m)} 开战！三局打完积分最低的淘汰`);
+    FX.danger(false); fxStart(m);
+  },
+
+  round_start(d) {
+    renderBracket(d);
+    const b = d.bracket, rd = b && b.rounds[b.rounds.length - 1];
+    if (rd) feed(null, `第 ${b.edition} 届 · ${rd.name} 开始：${rd.tables.map((t, i) => `${rd.size <= 3 ? "决赛桌" : LETTER[i] + "桌"} ${t.players.join("/")}`).join("  ")}`);
+  },
+
+  round_end(d) {
+    renderBracket(d);
+    showRoundEnd(d);
+    const rd = d.bracket.rounds[d.bracket.rounds.length - 1];
+    ticker(`${rd.name} 结束！晋级：${rd.advance.join("、")}`, true);
   },
 
   deal(d) {
@@ -1049,17 +1189,27 @@ const H = {
     G.seats.forEach((s) => (s.thinking = false)); G.turn = -1; FX.danger(false);
     for (let i = 0; i < 3; i++) showClock(i, false);
     dropThinking();
-    d.roles.forEach((r, i) => setExpr(i, G.seats[i].name === d.loser ? "sad" : r === d.winner_side ? "laugh" : "angry", 0));
-    d.roles.forEach((r, i) => { if (G.seats[i].name === d.loser) l2dAct(i, "lowerHead"); });
+    const out = new Set(d.eliminated || []), up = new Set(d.advanced || []);
+    d.roles.forEach((r, i) => {
+      const n = G.seats[i].name;
+      setExpr(i, out.has(n) ? "sad" : up.has(n) ? "laugh" : r === d.winner_side ? "happy" : "angry", 0);
+      if (out.has(n)) l2dAct(i, "lowerHead");
+    });
     d.hands_left.forEach((h, i) => { resyncHand(i, h); renderHand(i, false); });
     G.snap = d; G.profiles = d.profiles || G.profiles;
-    renderAllSeats(); renderBoard(d, true); setPhase("结算"); setHint("");
-    feed(null, `${d.winner_side}胜利 · ${d.loser} 下场${d.newcomer ? ` · ${d.newcomer} 上场` : ""}`);
-    ticker(`${d.winner_side}胜利！${d.loser} 被淘汰${d.newcomer ? `，${d.newcomer} 挑战登场` : ""}`, true);
+    renderAllSeats(); renderBracket(d); setPhase("结算"); setHint("");
+    const lead = (d.bracket && curTable(d.bracket) || {}).ranking || [];
+    if (d.table_done) {
+      feed(null, `${d.winner_side}胜利 · 晋级 ${(d.advanced || []).join("、") || "-"}${(d.eliminated || []).length ? ` · 淘汰 ${d.eliminated.join("、")}` : ""}`);
+      ticker(d.match && d.match.round_name === "决赛" ? `${(d.advanced || [])[0]} 夺得冠军！` : `本桌战罢！${(d.advanced || []).join("、")} 晋级${(d.eliminated || []).length ? `，${d.eliminated.join("、")} 淘汰` : ""}`, true);
+    } else {
+      feed(null, `${d.winner_side}胜利 · 本桌领先：${lead[0] || "-"}`);
+      ticker(`${d.winner_side}胜利！本桌暂列第一：${lead[0] || "-"}`, true);
+    }
     showResult(d);
   },
 
-  champion(d) { showChampion(d); },
+  champion(d) { G.match = null; renderBracket(d); showChampion(d); ticker(`第 ${d.bracket.edition} 届 token争霸赛冠军：${d.names[0]}！`, true); },
 
   demo_progress(d) {
     let el = $("demoPill");

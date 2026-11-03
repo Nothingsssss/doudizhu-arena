@@ -268,3 +268,183 @@ class Arena:
                 self.emit("champion", {"names": [p.name for p in self.table], **self.snapshot()})
                 break
             time.sleep(self.game_pause)
+
+
+ROUND_NAMES = {9: "9进6", 6: "6进3", 3: "决赛"}
+
+
+class Tournament:
+    """token争霸赛：9 人积分淘汰制。
+
+      第一轮 9进6：抽签分 3 桌，每桌打 3 局，每桌积分最低的 1 人淘汰
+      第二轮 6进3：分 2 桌，每桌打 3 局，两桌第一直接晋级；两桌第二比积分，高的晋级
+      决赛 3进1：剩下 3 人打 3 局，积分最高的夺冠
+    每轮积分清零重算。同分依次比：胜局多、剩牌少、抽签。
+    下一轮按上一轮的位置顺序分桌（流程图上的连线不交叉）。冠军产生后歇一会儿，重新抽签开下一届。
+
+    人数不是 9 也能跑：每轮保留 2/3（取 3 的倍数），到 3 人打决赛。
+    """
+
+    def __init__(self, players, emit, move_delay=1.0, game_pause=5.0, seed=None, tts=None, dealer=None,
+                 games_per_table=3, round_pause=None, champion_pause=30.0, entrants=9):
+        if len(players) < 3:
+            raise ValueError("至少需要 3 名玩家")
+        self.rng = random.Random(seed)
+        self.all_players = list(players)
+        self.entrants = max(3, entrants - entrants % 3)
+        self.emit = emit
+        self.move_delay = move_delay
+        self.game_pause = game_pause
+        self.round_pause = game_pause if round_pause is None else round_pause
+        self.champion_pause = champion_pause
+        self.tts = tts
+        self.dealer = dealer
+        self.games_per_table = games_per_table
+        self.profiles = {p.name: p.profile() for p in players}
+        self.running = True
+        self.game_no = 0
+        self.edition = 0
+        self.rounds = []
+        self.stats = {}
+        self.match = None
+        self.champion = None
+
+    # ---------- 赛程 ----------
+    @staticmethod
+    def next_size(n):
+        if n <= 3:
+            return 1
+        return max(3, (n * 2 // 3) // 3 * 3)
+
+    def _new_round(self, names):
+        n = len(names)
+        tables = [{"players": names[k:k + 3], "games": 0, "done": False, "ranking": [],
+                   "scores": {n: 0 for n in names[k:k + 3]},
+                   "advance": [], "out": [], "pending": []} for k in range(0, n, 3)]
+        return {"name": ROUND_NAMES.get(n, f"{n}进{self.next_size(n)}"), "size": n,
+                "target": self.next_size(n), "tables": tables, "done": False, "advance": []}
+
+    def bracket(self):
+        return {"edition": self.edition, "rounds": self.rounds, "match": self.match,
+                "champion": self.champion, "games_per_table": self.games_per_table,
+                "plan": self._plan()}
+
+    def _plan(self):
+        n, out = self.entrants, []
+        while True:
+            out.append(n)
+            if n <= 1:
+                return out
+            n = self.next_size(n)
+
+    def snapshot(self, table=None):
+        return {"game_no": self.game_no, "profiles": self.profiles, "table": table or [],
+                "stats": self.stats, "bracket": self.bracket()}
+
+    def _rank(self, names):
+        def key(n):
+            s = self.stats[n]
+            return (-s["score"], -s["wins"], s["left"], s["draw"])
+        return sorted(names, key=key)
+
+    # ---------- 一局 ----------
+    def _play_game(self, table, rnd, ti):
+        tb = rnd["tables"][ti]
+        self.game_no += 1
+        self.match = {"round": len(self.rounds) - 1, "round_name": rnd["name"], "table": ti,
+                      "game": tb["games"] + 1, "of": self.games_per_table}
+        seats = list(table)
+        k = tb["games"] % 3            # 每局换一下座位顺序
+        seats = seats[k:] + seats[:k]
+        names = [p.name for p in seats]
+        self.emit("game_start", {**self.snapshot(names), "match": self.match})
+        res = Game(seats, self.emit, self.move_delay, self.rng, self.tts, self.dealer).run()
+        deltas = []
+        for i, p in enumerate(seats):
+            s = self.stats[p.name]
+            won = res["roles"][i] == res["winner_side"]
+            pts = res["multiplier"] * (2 if res["roles"][i] == "地主" else 1)
+            d = pts if won else -pts
+            deltas.append(d)
+            s["games"] += 1
+            s["score"] += d
+            s["left"] += len(res["hands_left"][i])
+            if won:
+                s["wins"] += 1
+                s["streak"] += 1
+            else:
+                s["losses"] += 1
+                s["streak"] = 0
+        tb["games"] += 1
+        tb["scores"] = {n: self.stats[n]["score"] for n in tb["players"]}
+        tb["ranking"] = self._rank(tb["players"])
+        info = {}
+        if tb["games"] >= self.games_per_table:
+            tb["done"] = True
+            info = self._settle_table(rnd, tb)
+        self.emit("game_end", {**res, **self.snapshot(names), "deltas": deltas, "match": self.match,
+                               "table_done": tb["done"], **info})
+        return res
+
+    def _settle_table(self, rnd, tb):
+        """一桌打完：定下直接晋级、直接淘汰、待定（要和别桌同名次比）的人。"""
+        ntab = len(rnd["tables"])
+        sure, extra = divmod(rnd["target"], ntab)
+        rk = tb["ranking"]
+        tb["advance"] = rk[:sure]
+        tb["pending"] = rk[sure:sure + 1] if extra else []
+        tb["out"] = rk[sure + (1 if extra else 0):]
+        res = {"advanced": list(tb["advance"]), "eliminated": list(tb["out"]), "pending": list(tb["pending"]),
+               "reason": ""}
+        if all(t["done"] for t in rnd["tables"]) and extra:
+            # 所有桌打完：各桌待定的人比积分，取前 extra 名
+            cands = [n for t in rnd["tables"] for n in t["pending"]]
+            win = self._rank(cands)[:extra]
+            for t in rnd["tables"]:
+                for n in t["pending"]:
+                    (t["advance"] if n in win else t["out"]).append(n)
+                t["pending"] = []
+            res["playoff"] = {"advanced": win, "eliminated": [n for n in cands if n not in win]}
+        return res
+
+    # ---------- 一届 ----------
+    def run_edition(self):
+        self.edition += 1
+        self.champion = None
+        names = [p.name for p in self.all_players]
+        self.rng.shuffle(names)
+        names = names[:self.entrants] if len(names) >= self.entrants else names[:len(names) - len(names) % 3]
+        by_name = {p.name: p for p in self.all_players}
+        self.rounds = [self._new_round(names)]
+        while self.running:
+            rnd = self.rounds[-1]
+            self.stats = {n: {"games": 0, "wins": 0, "losses": 0, "score": 0, "left": 0, "streak": 0,
+                              "draw": self.rng.random()}
+                          for t in rnd["tables"] for n in t["players"]}
+            self.emit("round_start", self.snapshot())
+            for ti, tb in enumerate(rnd["tables"]):
+                table = [by_name[n] for n in tb["players"]]
+                while self.running and tb["games"] < self.games_per_table:
+                    self._play_game(table, rnd, ti)
+                    time.sleep(self.game_pause)
+            if not self.running:
+                return
+            rnd["done"] = True
+            # 按位置顺序晋级，保证流程图连线不交叉
+            rnd["advance"] = [n for t in rnd["tables"] for n in t["players"] if n in t["advance"]]
+            self.match = None
+            if rnd["target"] <= 1:
+                self.champion = rnd["advance"][0]
+                self.emit("champion", {**self.snapshot(), "names": [self.champion],
+                                       "final": rnd["tables"][0]["ranking"]})
+                return
+            self.emit("round_end", self.snapshot())
+            time.sleep(self.round_pause)
+            self.rounds.append(self._new_round(rnd["advance"]))
+
+    def run_forever(self, max_games=None, max_editions=None):
+        while self.running and (max_editions is None or self.edition < max_editions):
+            if max_games is not None and self.game_no >= max_games:
+                break
+            self.run_edition()
+            time.sleep(self.champion_pause)

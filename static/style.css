@@ -1,4 +1,4 @@
-/* AI 斗地主擂台 —— 国风金红主题，1920×1080 固定舞台，自动缩放 */
+/* token争霸赛 —— 基础样式和布局，1920×1080 固定舞台，自动缩放（赛博配色见 cyber.css） */
 :root {
   --gold: #ffd25a; --gold2: #e0901e; --gold3: #8a4a08; --cyan: #3ee7ff; --red: #d4202a; --muted: rgba(255,240,210,.62);
   --f-ui: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", "Source Han Sans SC", "Hiragino Sans GB", sans-serif;

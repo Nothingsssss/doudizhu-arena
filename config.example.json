@@ -1,24 +1,30 @@
 {
   "port": 8000,
   "arena": {
+    "format": "tournament",
+    "entrants": 9,
+    "games_per_table": 3,
     "move_delay": 1.5,
     "game_pause": 8,
-    "eliminate_forever": false,
+    "round_pause": 12,
+    "champion_pause": 30,
     "only_with_art": true,
-    "max_games": null,
-    "start_score": 1000,
-    "score_unit": 100
+    "max_games": null
   },
   "players": [
     {
       "name": "DeepSeek",
       "type": "llm",
       "base_url": "https://api.deepseek.com/v1",
-      "model": "deepseek-chat",
+      "model": "deepseek-flash",
       "api_key_env": "DEEPSEEK_API_KEY",
       "color": "#4f8cff",
       "voice_id": "",
-      "live2d": { "model": "live2d/models/deepseek/deepseek.model3.json", "scale": 1.6, "y": -0.5 }
+      "live2d": {
+        "model": "live2d/models/deepseek/deepseek.model3.json",
+        "scale": 1.6,
+        "y": -0.5
+      }
     },
     {
       "name": "通义千问",
