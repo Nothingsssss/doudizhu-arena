@@ -247,7 +247,11 @@ function l2dAct(i, a) { const c = l2dCtrl(i); if (c) c.interact(a).catch(() => {
 function l2dStopAll() { for (let i = 0; i < 3; i++) { const c = l2dCtrl(i); if (c) c.stopSpeaking(); } }
 
 function artOf(name, src) {
-  if (!ART.has(src)) ART.set(src, processArt(src, prof(name)).catch(() => null));
+  if (!ART.has(src)) {
+    const pr = processArt(src, prof(name)).catch(() => null);
+    pr.then((r) => (pr.ready = r));     // 处理完后同步可取（大招特写用）
+    ART.set(src, pr);
+  }
   return ART.get(src);
 }
 function hydrate(root) {
@@ -542,14 +546,55 @@ function seatPos(i) { return FX.at($("seat" + i).querySelector(".portrait")); }
 function playedCards(i) { return $("played" + i).querySelector(".cards"); }
 function rankCount(ranks) { const m = {}; ranks.forEach((r) => (m[r] = (m[r] || 0) + 1)); return m; }
 
+/* ================= 大招特写 =================
+ * 炸弹、王炸、报警、"大你" 时，把出牌人的立绘放大切到画面中间（见 cutin.js）。
+ * 图片优先用 static/avatars/<id>-<场景>.png（自己画/生成的场景图），没有就用全身立绘 + 表情图里对应的表情做眼部特写。 */
+const CUTIN_EXPR = { rocket: 6, bomb: 4, alarm: 9, beat: 7 };     // 大笑 / 生气（霸气）/ 兴奋 / 得意
+const CUTIN_ON = Q.get("cutin") !== "0";
+let lastBeatCutin = 0;
+function cutinPrepare(name) {
+  // 开局时预先处理图片，出炸弹时立刻就能用
+  const p = prof(name);
+  if (!p) return;
+  if (p.avatar) artOf(name, p.avatar);
+  if (p.faces && window.CUTIN) for (const k of Object.values(CUTIN_EXPR)) CUTIN.eyes(p.faces, k, p.cutin_eyes).catch(() => {});
+  for (const u of Object.values(p.cutins || {})) { const i = new Image(); i.src = u; }
+}
+function cutinFor(d) {
+  const scene = d.cutin;
+  if (!scene || !G.live || !CUTIN_ON || !window.CUTIN) return 0;
+  if (scene === "beat") {
+    if (performance.now() - lastBeatCutin < 6000) return 0;    // "大你" 太密就不切
+    lastBeatCutin = performance.now();
+  }
+  const s = G.seats[d.seat], p = prof(s.name);
+  let art = "", artKind = p.art === "bust" ? "bust" : "full";
+  const custom = (p.cutins || {})[scene];
+  if (custom) { art = custom; artKind = "scene"; }
+  else {
+    const r = p.avatar && ART.get(p.avatar);
+    art = r && r.ready && r.ready.full;
+  }
+  if (!art) return 0;                                           // 立绘还没处理好就不切，免得卡顿
+  const eyes = p.faces ? CUTIN.eyesNow(p.faces, CUTIN_EXPR[scene], p.cutin_eyes) : "";
+  const left = s.hand.length;
+  const title = { rocket: "王炸", bomb: "炸弹", alarm: "报警", beat: "大你" }[scene];
+  const sub = scene === "alarm" ? `${s.name} · 只剩 ${left} 张` : s.name;
+  return CUTIN.play({
+    tier: scene, side: $("seat" + d.seat).dataset.pos === "right" ? "right" : "left",
+    art, artKind, eyes, color: colorOf(s.name), title: title + (scene === "beat" ? "！" : ""), sub, sfx,
+  });
+}
+
 // 出牌特效：每种牌型对应一个动画；画面不震，只有炸弹爆炸时震一下
-function fxPlay(d) {
+// cut：大招特写的时长，炸弹/王炸的爆炸动画等特写放完再开始
+function fxPlay(d, cut = 0) {
   if (!G.live) return;
   const k = d.kind, el = playedCards(d.seat), p = playPos(d.seat), col = colorOf(G.seats[d.seat].name);
   sfx("slap");
   if (!el) return;
-  if (k === "rocket") return fxRocket(p);
-  if (k === "bomb") return fxBomb(p);
+  if (k === "rocket") return cut ? later(cut - 220, () => fxRocket(p, true)) : fxRocket(p);
+  if (k === "bomb") return cut ? later(cut - 220, () => fxBomb(p, true)) : fxBomb(p);
   if (k.startsWith("plane")) return fxPlane(d, el);
   if (k === "straight" || k === "pair_straight") return fxStraight(el, k);
   if (k.startsWith("four")) {
@@ -571,7 +616,7 @@ function fxPlay(d) {
 }
 function s_played(seat) { const s = G.seats[seat]; return Array.isArray(s.played) ? s.played.slice().sort(byAsc) : []; }
 
-function fxBomb(p) {
+function fxBomb(p, quiet) {
   COMBO.bomb({ p, sfx, onBoom: (x, y) => {
     if (!G.live) return;
     FX.flash(`radial-gradient(circle at ${(x / 19.2).toFixed(1)}% ${(y / 10.8).toFixed(1)}%, #fff, rgba(255,150,40,.7) 30%, rgba(140,10,0,.35) 65%, transparent)`, 700);
@@ -584,12 +629,13 @@ function fxBomb(p) {
     FX.embers(x, y, { n: 80, r: 170, colors: FIRE });
     FX.bgHit("hit-red", 1000);
     FX.thump(1);                // 全场唯一一次震屏
-    big("炸弹", "bomb", 1900); sfx("bomb");
+    if (!quiet) big("炸弹", "bomb", 1900);
+    sfx("bomb");
     later(600, () => FX.embers(x, y, { n: 40, r: 240, colors: FIRE }));
   } });
 }
 
-function fxRocket(p) {
+function fxRocket(p, quiet) {
   COMBO.rocket({ p, sfx, onBoom: (x, y) => {
     if (!G.live) return;
     FX.flash("radial-gradient(circle at 40% 24%, #fff, rgba(255,200,80,.6) 30%, rgba(160,0,20,.3) 65%, transparent)", 800);
@@ -602,7 +648,8 @@ function fxRocket(p) {
     const jk = document.createElement("div"); jk.className = "jokers sz-xl";
     jk.innerHTML = cardHtml({ r: 16 }, 0) + cardHtml({ r: 17 }, 1);
     fxAdd(jk, 2300);
-    big("王炸", "rocket", 2300); sfx("rocket");
+    if (!quiet) big("王炸", "rocket", 2300);
+    sfx("rocket");
     for (let k = 0; k < 6; k++) {
       later(350 + k * 230, () => {
         const tx = FX.rnd(160, 1380), ty = FX.rnd(110, 380);
@@ -899,7 +946,7 @@ const H = {
     G.snap = d; G.profiles = d.profiles || G.profiles; G.gameNo = d.game_no;
     G.bid = 0; G.mult = 1; G.landlord = -1; G.turn = -1; G.roles = [null, null, null];
     d.table.forEach((n, i) => Object.assign(G.seats[i], { name: n, hand: [], played: null, thinking: false, alarmed: false }));
-    for (let i = 0; i < 3; i++) { buildSeat(i); renderPlayed(i); showClock(i, false); setExpr(i, 0, 0); }
+    for (let i = 0; i < 3; i++) { buildSeat(i); renderPlayed(i); showClock(i, false); setExpr(i, 0, 0); cutinPrepare(G.seats[i].name); }
     l2dRetain();
     hideBubbles(); stopVoice(); setPhase("叫地主"); setHint("");
     $("bottom").innerHTML = cardsHtml([{ back: 1 }, { back: 1 }, { back: 1 }], 3, "sz-xs");
@@ -972,7 +1019,7 @@ const H = {
     if (d.cards.length) {
       const act = d.kind === "rocket" ? "王炸!(双王)" : d.kind === "bomb" ? "炸弹!" : "出牌:";
       feed(s.name, act, { chips: chipsHtml(s.played), say: text, hot: s.hot });
-      fxPlay(d);
+      fxPlay(d, cutinFor(d));
       if (d.kind === "rocket") ticker(`全场震撼！${s.name} 王炸！${G.roles[d.seat] === "地主" ? "农民" : "地主"}能否顶住？！`, true);
       else if (d.kind === "bomb") ticker(`${s.name} 一个炸弹砸下来！倍数翻到 ×${d.multiplier}`, true);
       else if (d.kind.startsWith("plane")) ticker(`${s.name} 飞机起飞！手牌一下少了一大截`);

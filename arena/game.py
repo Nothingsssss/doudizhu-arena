@@ -3,7 +3,11 @@ import random
 import time
 from collections import deque
 
-from .callout import alarm_call, bid_call, play_call
+from .callout import BEAT_LINE, alarm_call, bid_call, play_call
+
+# 立绘特写（大招式切入）在网页上的时长；后端多等这么久，免得下一手牌盖住特写
+CUTIN_PAUSE = {"rocket": 1.4, "bomb": 1.3, "alarm": 0.9, "beat": 0.6}
+BEAT_CHANCE = 0.3   # 压过对手的牌时，报"大你"的概率（游戏里也不是每次都喊）
 from .cards import TYPE_NAMES, fmt, new_deck, validate
 
 
@@ -16,12 +20,14 @@ class Game:
         self.tts = tts
         self.dealer = dealer        # 演示模式用：自定义发牌
 
-    def _sleep(self, clips=None):
-        # 有语音时等它念完再继续，避免几个人的话叠在一起
+    def _sleep(self, clips=None, extra=0.0):
+        # 有语音时等它念完再继续，避免几个人的话叠在一起；extra 留给立绘特写
         t = self.move_delay
         talk = sum(c.get("duration") or 0 for c in clips or [])
         if talk:
             t = max(t, talk + 0.3)
+        if t and extra:
+            t += extra
         if t:
             time.sleep(t)
 
@@ -100,6 +106,7 @@ class Game:
             self.emit("turn", {"seat": turn, "phase": "play", "lead": prev is None})
             t0 = time.time()
             cards, say = self.players[turn].play(view)
+            beaten = prev_seat if prev is not None else None   # 这手要压的是谁的牌
             think_ms = int((time.time() - t0) * 1000)
             try:
                 move = validate(cards, hands[turn], prev)
@@ -124,6 +131,15 @@ class Game:
             alarm = alarm_call(left) if move and left in (1, 2) and not alarmed[turn] else ""
             if alarm:
                 alarmed[turn] = True
+            # 压过对手（不是队友）的牌：有时喊"大你"
+            beat = move is not None and beaten is not None and beaten != turn and roles[beaten] != roles[turn]
+            cutin = ""
+            if move and move.type in ("rocket", "bomb"):
+                cutin = move.type
+            elif alarm:
+                cutin = "alarm"
+            elif beat and self.rng.random() < BEAT_CHANCE:
+                call, cutin = BEAT_LINE, "beat"
             clips = self._voice(turn, call, alarm, say)
             self.emit("play", {"seat": turn, "call": call, "alarm": alarm, "clips": clips,
                                "cards": list(move.cards) if move else [],
@@ -131,8 +147,9 @@ class Game:
                                "kind": move.type if move else "pass",
                                "say": say, "cards_left": [len(h) for h in hands],
                                "hands": [list(h) for h in hands], "think_ms": think_ms,
-                               "multiplier": base * (2 ** bombs)})
-            self._sleep(clips)
+                               "multiplier": base * (2 ** bombs),
+                               "beat": beaten if beat else None, "cutin": cutin})
+            self._sleep(clips, CUTIN_PAUSE.get(cutin, 0.0))
             if not hands[turn]:
                 winner_side = roles[turn]
                 break

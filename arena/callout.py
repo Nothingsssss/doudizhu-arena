@@ -28,6 +28,9 @@ def play_call(move, rng=None):
     return ""
 
 
+BEAT_LINE = "大你"
+
+
 def bid_call(bid):
     return BID_LINES.get(bid, "")
 

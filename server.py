@@ -85,6 +85,31 @@ def resolve_avatar(p, field="avatar", suffix=""):
     return ""
 
 
+CUTIN_SCENES = ("bomb", "rocket", "alarm", "beat")
+
+
+def resolve_cutins(p):
+    """大招特写的场景图：配置里写了就用配置的，否则找 static/avatars/<id>-bomb.png 这类文件；都没有就不写（网页用立绘+表情）。"""
+    out = {}
+    given = getattr(p, "cutins", None) or {}
+    for scene in CUTIN_SCENES:
+        v = str(given.get(scene) or "").strip()
+        if v.startswith(("http://", "https://", "data:")):
+            out[scene] = v
+            continue
+        if v:
+            f = (STATIC / v.lstrip("/")).resolve()
+            if STATIC.resolve() in f.parents and f.is_file():
+                out[scene] = v.lstrip("/")
+            else:
+                print(f"[cutin] {p.name}：找不到 static/{v}，{scene} 特写改用立绘", flush=True)
+            continue
+        found = resolve_avatar(type("P", (), {"id": p.id, "code": p.code, "img": ""})(), "img", f"-{scene}")
+        if found:
+            out[scene] = found
+    return out
+
+
 def resolve_live2d(p):
     """Live2D 模型：检查 model3.json 是否在 static/ 里真实存在，不存在就不启用（网页继续显示立绘）。"""
     cfg = getattr(p, "live2d", None)
@@ -183,6 +208,7 @@ def main():
         p.avatar = resolve_avatar(p)
         p.faces = resolve_avatar(p, "faces", "-faces")
         p.live2d = resolve_live2d(p)
+        p.cutins = resolve_cutins(p)
     arena = Arena(players, emit,
                   move_delay=a.get("move_delay", 1.5),
                   game_pause=a.get("game_pause", 8),

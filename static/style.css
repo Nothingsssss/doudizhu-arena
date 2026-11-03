@@ -483,3 +483,51 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; colo
   animation: glint .55s ease-out forwards; animation-delay: var(--gd, 0ms); }
 @keyframes glint { from { background-position: 140% 0; } to { background-position: -60% 0; } }
 .played .cards { perspective: 800px; }
+
+/* ================= 大招特写（立绘切入） ================= */
+#cutin { position: absolute; inset: 0; z-index: 39; pointer-events: none; overflow: hidden; }
+.ci { position: absolute; inset: 0; }
+.ci-back { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 50%, rgba(10,0,0,.8), #000 75%); }
+.ci-flash { position: absolute; inset: 0; background: #fff; mix-blend-mode: screen; }
+.ci-band { position: absolute; left: -60px; right: -60px; top: 540px; height: var(--bh); transform-origin: 50% 50%; overflow: hidden;
+  background: linear-gradient(90deg, rgba(0,0,0,.85), color-mix(in srgb, var(--c) 55%, #000) 30%, var(--c) 55%, color-mix(in srgb, var(--c) 55%, #000) 80%, rgba(0,0,0,.85));
+  box-shadow: 0 0 60px color-mix(in srgb, var(--c) 70%, transparent), inset 0 0 120px rgba(0,0,0,.55); }
+.ci-lines { position: absolute; inset: -20px -200px; opacity: .55; mix-blend-mode: screen;
+  background: repeating-linear-gradient(180deg, transparent 0 13px, rgba(255,255,255,.55) 13px 15px, transparent 15px 31px, rgba(255,255,255,.22) 31px 32px, transparent 32px 47px);
+  -webkit-mask-image: repeating-linear-gradient(90deg, #000 0 220px, transparent 220px 300px, #000 300px 420px, transparent 420px 470px);
+  mask-image: repeating-linear-gradient(90deg, #000 0 220px, transparent 220px 300px, #000 300px 420px, transparent 420px 470px);
+  animation: ciLines .22s linear infinite; }
+.ci.r .ci-lines { animation-direction: reverse; }
+@keyframes ciLines { from { transform: translateX(0); } to { transform: translateX(-470px); } }
+.ci-edge { position: absolute; left: 0; right: 0; height: 8px; background: linear-gradient(90deg, transparent, #fff3c4 20%, var(--gold) 50%, #fff3c4 80%, transparent); box-shadow: 0 0 18px var(--gold); }
+.ci-edge.top { top: 0; } .ci-edge.bot { bottom: 0; }
+/* 眼部特写条 */
+.ci-eyes { position: absolute; left: -40px; right: -40px; top: 128px; height: 150px; overflow: hidden; transform-origin: 50% 50%;
+  border-top: 4px solid var(--gold); border-bottom: 4px solid var(--gold); box-shadow: 0 0 34px rgba(0,0,0,.8), 0 0 24px color-mix(in srgb, var(--c) 60%, transparent);
+  background: #000; }
+.ci-eyes img { position: absolute; left: 50%; top: 50%; width: 1500px; transform: translate(-50%, -50%); filter: contrast(1.12) saturate(1.15); }
+.ci-eyes::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, #000 0, transparent 22%, transparent 78%, #000 100%); }
+/* 人物：从色带里冲出来，头可以超出色带上沿，下面被色带下沿截住 */
+.ci-fig { position: absolute; left: 0; right: 0; top: 0; bottom: 0;
+  clip-path: polygon(0 0, 100% 0, 100% calc(540px + var(--bh) / 2 - 67px), 0 calc(540px + var(--bh) / 2 + 67px)); }
+.ci-fig img { position: absolute; left: 110px; top: 210px; height: 1380px; width: auto; max-width: none;
+  filter: drop-shadow(0 0 3px #fff) drop-shadow(0 0 22px color-mix(in srgb, var(--c) 85%, transparent)) drop-shadow(18px 0 0 rgba(0,0,0,.35)); }
+.ci-fig.bust img { height: 640px; top: 240px; left: 180px; }
+.ci-fig.scene img { height: auto; width: auto; max-height: 760px; max-width: 980px; top: 180px; left: 80px; }
+.ci.r .ci-fig img { left: auto; right: 110px; }
+.ci.r .ci-fig.bust img { right: 180px; }
+.ci.r .ci-fig.scene img { right: 80px; }
+/* 大字 */
+.ci-words { position: absolute; left: 1290px; top: 560px; display: flex; flex-direction: column; align-items: center; white-space: nowrap; }
+.ci.r .ci-words { left: 640px; }
+.ci-words b { font: 900 220px/1 var(--f-brush); letter-spacing: 6px; color: transparent;
+  background: linear-gradient(180deg, #fffbe0 0%, #ffe28a 38%, #ffb21f 62%, #ff6a00 100%); -webkit-background-clip: text; background-clip: text;
+  -webkit-text-stroke: 3px #5a0e00; filter: drop-shadow(0 6px 0 #8a1a00) drop-shadow(0 12px 0 #3a0600) drop-shadow(0 0 30px rgba(255,200,90,.9)); }
+.ci-words i { font: italic 900 52px/1.2 var(--f-ui); color: #fff; letter-spacing: 4px; margin-top: 4px; text-shadow: 0 3px 0 #000, 0 0 18px var(--c); }
+.ci.rocket .ci-words b { font-size: 250px; background: linear-gradient(180deg, #fff 0%, #ffe9a0 30%, #ff9ad0 60%, #8a7bff 100%); -webkit-background-clip: text; background-clip: text; }
+.ci.alarm .ci-words b { font-size: 190px; background: linear-gradient(180deg, #fff 0%, #ffb3bd 40%, #ff2d4a 75%, #a0001a 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-stroke-color: #3a0008; }
+.ci.alarm .ci-band { background: linear-gradient(90deg, rgba(0,0,0,.85), #5a0010 30%, #d4202a 55%, #5a0010 80%, rgba(0,0,0,.85)); }
+.ci.beat .ci-words b { font-size: 160px; }
+.ci.beat .ci-words i { font-size: 40px; }
+.ci.beat .ci-fig img { height: 1100px; top: 330px; }
+.ci.beat .ci-fig.bust img { height: 470px; top: 330px; }

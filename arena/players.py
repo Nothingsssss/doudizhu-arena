@@ -12,7 +12,7 @@ class Player:
     sim = False   # True：没接真实接口，由本地机器人模拟出牌
 
     def __init__(self, name, avatar="", color="", voice_id="", id="", title="", voice_sim=None,
-                 cutout="auto", code="", art="full", face=None, faces="", live2d=None, **kw):
+                 cutout="auto", code="", art="full", face=None, faces="", live2d=None, cutins=None, **kw):
         self.name = name
         self.id = id or re.sub(r"\W+", "", name.lower()) or "player"
         self.title = title          # 形象名，如"鲸鱼女仆"，显示在名字下面
@@ -28,12 +28,16 @@ class Player:
         # Live2D 模型配置：{"model": "live2d/models/<id>/<id>.model3.json", "scale", "x", "y", "expressions", "motions"}
         # 或直接写 model3.json 路径。没有或加载失败时继续用立绘图片
         self.live2d = {"model": live2d} if isinstance(live2d, str) else (live2d or None)
+        # 大招特写用的场景图：{"bomb": ..., "rocket": ..., "alarm": ..., "beat": ...}，默认找 static/avatars/<id>-<场景>.png，
+        # 没有就用全身立绘 + 表情图里对应的表情
+        self.cutins = dict(cutins or {})
+        self.cutin_eyes = kw.get("cutin_eyes")   # 眼部特写在表情图每格里的上下范围 [0.3, 0.56]（按格子高度比例）
         self.color = color          # 主题色，如 "#4f8cff"
         self.model = kw.get("model", "规则机器人" if kw.get("type") == "bot" else "")
 
     def profile(self):
         return {"id": self.id, "code": self.code, "title": self.title, "avatar": self.avatar,
-                "cutout": self.cutout, "art": self.art, "face": self.face, "faces": self.faces, "live2d": self.live2d,
+                "cutout": self.cutout, "art": self.art, "face": self.face, "faces": self.faces, "live2d": self.live2d, "cutins": self.cutins, "cutin_eyes": self.cutin_eyes,
                 "color": self.color, "model": self.model, "sim": self.sim, "voice_sim": self.voice_sim}
 
     def bid(self, view):
@@ -222,7 +226,7 @@ def make_player(cfg, simulate=None):
 
 
 # 模拟玩家沿用的展示字段
-SIM_KEEP = ("name", "id", "code", "title", "avatar", "cutout", "art", "face", "faces", "live2d", "color", "voice_id", "voice_sim", "model")
+SIM_KEEP = ("name", "id", "code", "title", "avatar", "cutout", "art", "face", "faces", "live2d", "cutins", "cutin_eyes", "color", "voice_id", "voice_sim", "model")
 
 
 __all__ = ["Player", "BotPlayer", "LLMPlayer", "make_player", "NAMES"]
