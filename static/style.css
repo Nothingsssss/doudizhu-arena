@@ -100,6 +100,17 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; colo
 .portrait .crown { position: absolute; left: 50%; top: -6px; width: 110px; transform: translateX(-50%) rotate(-10deg); filter: drop-shadow(0 0 16px rgba(255,200,60,.9)); display: none; z-index: 2; }
 .seat.landlord .portrait .crown { display: block; animation: crownDrop .7s cubic-bezier(.3, 1.6, .5, 1); }
 @keyframes crownDrop { 0% { transform: translate(-50%, -120px) rotate(-40deg); opacity: 0; } 100% { transform: translateX(-50%) rotate(-10deg); opacity: 1; } }
+/* 表情框：立绘旁的圆形头像，跟着出牌换表情 */
+.seat .expr { position: absolute; z-index: 3; width: 128px; height: 128px; border-radius: 50%; padding: 5px;
+  background: conic-gradient(from 200deg, #fff1b8, #e0a42a, #8a5a12, #f6d36a, #fff1b8); box-shadow: 0 0 0 3px #3a0a0a, 0 6px 22px rgba(0,0,0,.6), 0 0 18px rgba(255,196,64,.35); }
+.seat .expr i { display: block; width: 100%; height: 100%; border-radius: 50%; background-color: #2a0d12; background-repeat: no-repeat; background-size: 500% 200%;
+  box-shadow: inset 0 0 12px rgba(0,0,0,.55); }
+.seat .expr.pop { animation: exprPop .42s cubic-bezier(.3, 1.7, .5, 1); }
+@keyframes exprPop { 0% { transform: scale(.82); } 100% { transform: scale(1); } }
+.seat[data-pos="left"] .expr { left: 360px; top: 96px; }
+.seat[data-pos="right"] .expr { left: 1040px; top: 96px; }
+.seat[data-pos="bottom"] .expr { left: 640px; top: 560px; }
+.seat.out .expr { filter: grayscale(1) brightness(.6); }
 .seat .ai-tag { position: absolute; z-index: 2; width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font: 900 18px var(--f-num); color: #3ee7ff;
   background: radial-gradient(circle, #0b3446, #061a24); border: 2px solid #3ee7ff; box-shadow: 0 0 14px rgba(62,231,255,.8); }
 .seat[data-pos="left"] .ai-tag { left: 320px; top: 210px; }

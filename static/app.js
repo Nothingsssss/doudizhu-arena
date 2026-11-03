@@ -148,6 +148,37 @@ async function sheetFace(src) {
   const x = Math.max(0, Math.min(W - s, (x0 + x1) / 2 - s / 2));
   return { img, x, y: Math.max(0, y0 - s * 0.02), s };
 }
+/* ================= 表情 =================
+ * 表情图是 2 行 5 列，所有角色顺序一样：
+ *   0 平常  1 开心  2 思考  3 惊讶  4 生气  5 委屈  6 大笑  7 得意  8 害羞  9 兴奋
+ * 牌桌上每个立绘旁有个圆形表情框，跟着出牌切换，几秒后回到平常；结算时的表情一直保持到下一局。 */
+const EXPR = { calm: 0, happy: 1, think: 2, shock: 3, angry: 4, sad: 5, laugh: 6, smug: 7, shy: 8, hype: 9 };
+const exprTimers = [0, 0, 0];
+function setExpr(i, mood, ms = 2600) {
+  const el = $("seat" + i) && $("seat" + i).querySelector(".expr");
+  if (!el) return;
+  const k = typeof mood === "number" ? mood : EXPR[mood] ?? 0;
+  const p = prof(G.seats[i].name);
+  const face = el.querySelector("i");
+  if (!face.style.backgroundImage) face.style.backgroundImage = `url("${p.faces}")`;
+  face.style.backgroundPosition = `${(k % 5) * 25}% ${k < 5 ? 0 : 100}%`;
+  if (el.dataset.k !== String(k)) { el.dataset.k = k; el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
+  clearTimeout(exprTimers[i]);
+  if (ms > 0 && k !== 0) exprTimers[i] = setTimeout(() => setExpr(i, 0, 0), ms);
+}
+const others = (i) => [0, 1, 2].filter((j) => j !== i);
+function exprPlay(d) {
+  const i = d.seat, k = d.kind || "";
+  if (!d.cards.length) return setExpr(i, "sad");
+  if (k === "rocket" || k === "bomb") {
+    setExpr(i, "smug", 3200);
+    others(i).forEach((j) => setExpr(j, G.roles[j] && G.roles[j] === G.roles[i] ? "laugh" : "shock", 3200));
+    return;
+  }
+  if (k.startsWith("plane") || k === "straight" || k === "pair_straight" || k.startsWith("four")) return setExpr(i, "hype");
+  setExpr(i, Math.random() < 0.5 ? "happy" : "shy", 2000);
+}
+
 function artOf(name, src) {
   if (!ART.has(src)) ART.set(src, processArt(src, prof(name)).catch(() => null));
   return ART.get(src);
@@ -276,6 +307,7 @@ function buildSeat(i) {
   const meta = [p.title, p.model].filter(Boolean).map(esc).join(" · ");
   el.innerHTML = `
     <div class="portrait"><div class="aura"></div><div class="${artCls(s.name)}" data-name="${esc(s.name)}">${artHtml(s.name)}</div>${CROWN}</div>
+    ${p.faces ? `<div class="expr"><i></i></div>` : ""}
     <div class="ai-tag">AI</div>
     <div class="alarm-light"></div>
     <div class="plate">
@@ -793,7 +825,7 @@ const H = {
     G.snap = d; G.profiles = d.profiles || G.profiles; G.gameNo = d.game_no;
     G.bid = 0; G.mult = 1; G.landlord = -1; G.turn = -1; G.roles = [null, null, null];
     d.table.forEach((n, i) => Object.assign(G.seats[i], { name: n, hand: [], played: null, thinking: false, alarmed: false }));
-    for (let i = 0; i < 3; i++) { buildSeat(i); renderPlayed(i); showClock(i, false); }
+    for (let i = 0; i < 3; i++) { buildSeat(i); renderPlayed(i); showClock(i, false); setExpr(i, 0, 0); }
     hideBubbles(); stopVoice(); setPhase("叫地主"); setHint("");
     $("bottom").innerHTML = cardsHtml([{ back: 1 }, { back: 1 }, { back: 1 }], 3, "sz-xs");
     renderBoard(d, false); renderAllSeats();
@@ -814,6 +846,7 @@ const H = {
   turn(d) {
     const s = G.seats[d.seat];
     G.turn = d.seat; s.thinking = true; s.t0 = performance.now();
+    setExpr(d.seat, "think", 0);
     if (d.phase === "play") { s.played = null; renderPlayed(d.seat); }
     bubble(d.seat, "", "");
     for (let i = 0; i < 3; i++) showClock(i, i === d.seat);
@@ -829,7 +862,8 @@ const H = {
     bubble(d.seat, `<b class="bid">${what}</b>`, text, warn);
     feed(s.name, what, { say: text, pass: !d.bid });
     if (d.bid) { G.bid = d.bid; setTop(); }
-    sfx(d.bid ? "bid" : "pass"); renderAllSeats(); fxBid(d); speakClips(s.name, d.clips);
+    sfx(d.bid ? "bid" : "pass"); renderAllSeats(); fxBid(d);
+    setExpr(d.seat, d.bid === 3 ? "hype" : d.bid ? "happy" : "calm"); speakClips(s.name, d.clips);
   },
 
   landlord(d) {
@@ -844,6 +878,7 @@ const H = {
     feed(null, `${s.name} 成为地主，底牌 ${fmtRanks(d.bottom)}`);
     ticker(`${s.name} 抢到地主！${farmersOf(d.seat).join("、")} 联手能否掀翻？`, true);
     fxLandlord(d.seat, s.name);
+    setExpr(d.seat, "laugh", 3000); others(d.seat).forEach((j) => setExpr(j, "angry", 2400));
   },
 
   play(d) {
@@ -869,11 +904,14 @@ const H = {
     } else { feed(s.name, d.call || "不要", { say: text, pass: true }); sfx("pass"); }
 
     speakClips(s.name, d.clips);
+    exprPlay(d);
     if (d.multiplier) setMult(d.multiplier);
     const left = s.hand.length;
     if (left > 0 && left <= 2 && !s.alarmed) {
       s.alarmed = true; fxAlarm(d.seat, left); if (!G.live) FX.danger(true);
       ticker(`${s.name} 报警！只剩 ${left} 张牌！`, true);
+      setExpr(d.seat, "smug", 3000);
+      others(d.seat).forEach((j) => { if (G.roles[j] !== G.roles[d.seat]) setExpr(j, "shock", 2400); });
     }
     G.turn = -1; setHint("");
     renderAllSeats();
@@ -887,6 +925,7 @@ const H = {
     G.seats.forEach((s) => (s.thinking = false)); G.turn = -1; FX.danger(false);
     for (let i = 0; i < 3; i++) showClock(i, false);
     dropThinking();
+    d.roles.forEach((r, i) => setExpr(i, G.seats[i].name === d.loser ? "sad" : r === d.winner_side ? "laugh" : "angry", 0));
     d.hands_left.forEach((h, i) => { resyncHand(i, h); renderHand(i, false); });
     G.snap = d; G.profiles = d.profiles || G.profiles;
     renderAllSeats(); renderBoard(d, true); setPhase("结算"); setHint("");
