@@ -7,15 +7,25 @@ from .cards import TYPE_NAMES, fmt, new_deck, validate
 
 
 class Game:
-    def __init__(self, players, emit, move_delay=1.0, rng=None):
+    def __init__(self, players, emit, move_delay=1.0, rng=None, tts=None):
         self.players = players          # 3 个 Player，按座位顺序（逆时针出牌）
         self.emit = emit
         self.move_delay = move_delay
         self.rng = rng or random.Random()
+        self.tts = tts
 
-    def _sleep(self):
-        if self.move_delay:
-            time.sleep(self.move_delay)
+    def _sleep(self, audio=None):
+        # 有语音时等它念完再继续，避免几个人的话叠在一起
+        t = self.move_delay
+        if audio and audio.get("duration"):
+            t = max(t, audio["duration"] + 0.3)
+        if t:
+            time.sleep(t)
+
+    def _voice(self, seat, say):
+        if not self.tts or not say:
+            return None
+        return self.tts.speak(say, getattr(self.players[seat], "voice_id", ""))
 
     def _deal(self):
         deck = new_deck()
@@ -34,9 +44,11 @@ class Game:
                 t0 = time.time()
                 b, say = self.players[seat].bid(view)
                 b = b if (b == 0 or best < b <= 3) else 0
-                self.emit("bid", {"seat": seat, "bid": b, "say": say,
-                                  "think_ms": int((time.time() - t0) * 1000)})
-                self._sleep()
+                think_ms = int((time.time() - t0) * 1000)
+                audio = self._voice(seat, say)
+                self.emit("bid", {"seat": seat, "bid": b, "say": say, "audio": audio,
+                                  "think_ms": think_ms})
+                self._sleep(audio)
                 if b > best:
                     best, landlord = b, seat
                 if best == 3:
@@ -93,13 +105,14 @@ class Game:
             else:
                 passes += 1
                 history.append((names[turn], roles[turn], []))
-            self.emit("play", {"seat": turn, "cards": list(move.cards) if move else [],
+            audio = self._voice(turn, say)
+            self.emit("play", {"seat": turn, "audio": audio, "cards": list(move.cards) if move else [],
                                "type": TYPE_NAMES[move.type] if move else "不要",
                                "kind": move.type if move else "pass",
                                "say": say, "cards_left": [len(h) for h in hands],
                                "hands": [list(h) for h in hands], "think_ms": think_ms,
                                "multiplier": base * (2 ** bombs)})
-            self._sleep()
+            self._sleep(audio)
             if not hands[turn]:
                 winner_side = roles[turn]
                 break
@@ -128,10 +141,11 @@ class Arena:
     """
 
     def __init__(self, players, emit, move_delay=1.0, game_pause=5.0,
-                 eliminate_forever=False, seed=None):
+                 eliminate_forever=False, seed=None, tts=None):
         if len(players) < 3:
             raise ValueError("至少需要 3 名玩家")
         self.rng = random.Random(seed)
+        self.tts = tts
         self.table = list(players[:3])
         self.queue = deque(players[3:])
         self.out = []
@@ -171,7 +185,7 @@ class Arena:
     def play_one(self):
         self.game_no += 1
         self.emit("game_start", {"game_no": self.game_no, **self.snapshot()})
-        res = Game(self.table, self.emit, self.move_delay, self.rng).run()
+        res = Game(self.table, self.emit, self.move_delay, self.rng, self.tts).run()
 
         win_side = res["winner_side"]
         for i, p in enumerate(self.table):

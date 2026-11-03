@@ -387,15 +387,30 @@ const SOUNDS = {
   next: () => { arp([440, 554, 659, 880, 1109], 0.06, 0.16, "square", 0.06); noise(0.5, 0.3, 0, 500, 6000, "bandpass"); },
   start: () => { arp([330, 440, 554], 0.1, 0.18, "triangle", 0.1); noise(0.8, 0.3, 0, 300, 5000, "bandpass"); },
 };
+/* ================= 选手语音（HeyGen 合成，后端缓存成文件） ================= */
+const VOICE = { on: localStorage.getItem("dd_voice") !== "off", cur: null };
+function speak(audio) {
+  if (!G.live || !VOICE.on || !audio || !audio.url) return;
+  try {
+    if (VOICE.cur) VOICE.cur.pause();
+    const a = new Audio(audio.url); a.volume = 1;
+    VOICE.cur = a; FX.duck(true);
+    const done = () => { if (VOICE.cur === a) { VOICE.cur = null; FX.duck(false); } };
+    a.onended = done; a.onerror = done;
+    const p = a.play(); if (p && p.catch) p.catch(done);
+  } catch (e) { FX.duck(false); }
+}
 function sfx(name) { if (G.live && SFX.on && SOUNDS[name]) { try { SOUNDS[name](); } catch (e) { /* 忽略 */ } } }
 function initSoundBtn() {
-  const b = $("sound"), m = $("bgm");
+  const b = $("sound"), m = $("bgm"), v = $("voice");
   const paint = () => {
+    v.textContent = VOICE.on ? "语音 开" : "语音 关"; v.classList.toggle("off", !VOICE.on);
     b.textContent = SFX.on ? "音效 开" : "音效 关"; b.classList.toggle("off", !SFX.on);
     m.textContent = FX.BGM.on ? "音乐 开" : "音乐 关"; m.classList.toggle("off", !FX.BGM.on);
   };
   b.onclick = () => { SFX.on = !SFX.on; localStorage.setItem("dd_sound", SFX.on ? "on" : "off"); if (SFX.on) actx(); paint(); };
   m.onclick = () => { FX.bgmToggle(); paint(); };
+  v.onclick = () => { VOICE.on = !VOICE.on; localStorage.setItem("dd_voice", VOICE.on ? "on" : "off"); if (!VOICE.on && VOICE.cur) VOICE.cur.pause(); paint(); };
   paint();
 }
 
@@ -529,7 +544,7 @@ const H = {
     bubble(d.seat, `<b class="bid">${d.bid ? `叫 ${d.bid} 分` : "不叫"}</b>`, text, warn);
     feed(s.name, d.bid ? `叫 ${d.bid} 分` : "不叫", { say: text, pass: !d.bid });
     if (d.bid) { G.bid = d.bid; setTop(); }
-    sfx(d.bid ? "bid" : "pass"); renderAllSeats(); fxBid(d);
+    sfx(d.bid ? "bid" : "pass"); renderAllSeats(); fxBid(d); speak(d.audio);
   },
 
   landlord(d) {
@@ -562,6 +577,7 @@ const H = {
       fxPlay(d);
     } else { feed(s.name, "不要", { say: text, pass: true }); sfx("pass"); }
 
+    speak(d.audio);
     if (d.multiplier) setMult(d.multiplier);
     const left = s.hand.length;
     if (left > 0 && left <= 2 && !s.alarmed) { s.alarmed = true; fxAlarm(d.seat, left); if (!G.live) FX.danger(true); }

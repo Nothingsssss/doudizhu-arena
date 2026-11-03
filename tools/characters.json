@@ -1,0 +1,85 @@
+{
+  "_说明": "每个二创形象想要的声音。player 填 config.json 里对应选手的 name；tags 用来在音色列表里打分匹配；line 是试听用的台词。",
+  "characters": [
+    {
+      "id": "deepseek",
+      "player": "DeepSeek",
+      "image": "蓝发鲸鱼女仆（含 Q 版）",
+      "voice": "元气、开朗、少女、语速偏快",
+      "gender": "female",
+      "tags": ["cheerful", "energetic", "young", "bright", "lively", "cute", "girl", "活泼", "元气", "开朗", "少女", "甜"],
+      "avoid": ["old", "deep", "mature", "老", "低沉"],
+      "line": "嘿嘿，这把我一定能赢！鲸鱼女仆出击，炸弹拿去！"
+    },
+    {
+      "id": "qwen",
+      "player": "通义千问",
+      "image": "紫发古风、手持折扇",
+      "voice": "温婉、知性、古风、语速偏慢",
+      "gender": "female",
+      "tags": ["gentle", "soft", "elegant", "calm", "warm", "graceful", "温柔", "温婉", "知性", "优雅", "古风"],
+      "avoid": ["energetic", "loud", "child", "excited"],
+      "line": "这一手，且慢。待我轻摇折扇，再与诸位细细算来。"
+    },
+    {
+      "id": "mimo",
+      "player": "MiMo",
+      "image": "白橙双马尾、拿手机的学生少女",
+      "voice": "活泼、俏皮、学生感、明亮",
+      "gender": "female",
+      "tags": ["playful", "young", "bright", "cheerful", "teen", "cute", "lively", "俏皮", "可爱", "少女", "学生", "活泼"],
+      "avoid": ["old", "deep", "mature", "serious"],
+      "line": "耶！这手牌我拍照留念了，你们准备好认输吧！"
+    },
+    {
+      "id": "doubao",
+      "player": "豆包",
+      "image": "黄色圆滚滚、棕色短发",
+      "voice": "甜美、亲切、邻家、温暖",
+      "gender": "female",
+      "tags": ["sweet", "friendly", "warm", "kind", "cute", "soft", "甜美", "亲切", "温暖", "邻家", "可爱"],
+      "avoid": ["cold", "deep", "serious", "old"],
+      "line": "大家好呀，我是豆包，打牌也要开开心心哦！"
+    },
+    {
+      "id": "claude",
+      "player": "Claude",
+      "image": "橙色像素机器人",
+      "voice": "沉稳、友善、略带机械感，可以选男声或中性声音",
+      "gender": "",
+      "tags": ["calm", "friendly", "neutral", "clear", "narrator", "steady", "robot", "沉稳", "友善", "清晰", "中性"],
+      "avoid": ["child", "excited"],
+      "line": "正在计算胜率……计算完成。这一手，我选择出炸弹。"
+    },
+    {
+      "id": "gothic",
+      "player": "（待确认）",
+      "image": "黑发哥特、尖帽、抱着书",
+      "voice": "清冷、轻声、安静、知性少女",
+      "gender": "female",
+      "tags": ["calm", "soft", "quiet", "cool", "whisper", "gentle", "serious", "清冷", "安静", "轻柔", "知性", "冷静"],
+      "avoid": ["energetic", "cheerful", "excited", "loud"],
+      "line": "……书上说，这种时候应该先出小牌。那么，就这样吧。"
+    },
+    {
+      "id": "silver",
+      "player": "（待确认）",
+      "image": "银发编发、藏青色礼服",
+      "voice": "优雅、成熟、大小姐、从容",
+      "gender": "female",
+      "tags": ["elegant", "mature", "calm", "confident", "smooth", "graceful", "优雅", "成熟", "从容", "御姐", "知性"],
+      "avoid": ["child", "excited", "cute"],
+      "line": "这点程度的牌，还不足以让我认真。请继续吧。"
+    },
+    {
+      "id": "scarf",
+      "player": "（待确认）",
+      "image": "黑长发、红围巾、黑色长袍",
+      "voice": "冷静、干练、带一点侠气",
+      "gender": "female",
+      "tags": ["confident", "cool", "clear", "strong", "steady", "crisp", "冷静", "干练", "坚定", "清亮"],
+      "avoid": ["child", "cute", "whisper"],
+      "line": "出手便不回头。这一手，我压了。"
+    }
+  ]
+}

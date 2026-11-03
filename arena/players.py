@@ -9,8 +9,9 @@ from .cards import NAMES, TYPE_NAMES, fmt, legal_moves, parse, validate
 
 
 class Player:
-    def __init__(self, name, avatar="", color="", **kw):
+    def __init__(self, name, avatar="", color="", voice_id="", **kw):
         self.name = name
+        self.voice_id = voice_id  # HeyGen 音色 ID（可选）
         self.avatar = avatar      # 头像图片地址（可选）
         self.color = color        # 主题色，如 "#4f8cff"（可选）
         self.model = kw.get("model", "规则机器人" if kw.get("type") == "bot" else "")

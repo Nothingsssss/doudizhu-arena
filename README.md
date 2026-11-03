@@ -67,6 +67,25 @@ API Key 放环境变量（`export DEEPSEEK_API_KEY=...`），不要写进配置�
 
 列表前 3 个先上桌，后面的按顺序排队。
 
+## 选手语音（HeyGen）
+
+每个选手的发言可以用 HeyGen 的 `heygen-voice-1-turbo-free` 模型念出来。后端合成后缓存到 `static/audio/`，同一句话不会重复请求；网页播放语音时会自动压低背景音乐，并等这句念完再出下一手。
+
+1. 设置密钥（只放环境变量，不要写进任何文件或提交到仓库）：
+   ```powershell
+   $env:HEYGEN_API_KEY = "你的密钥"
+   ```
+2. 查音色并按形象推荐：
+   ```bash
+   python tools/voices.py list        # 拉取公开音色，保存 voices.json，列出中文音色和试听地址
+   python tools/voices.py suggest     # 按 tools/characters.json 给每个形象推荐 3 个
+   python tools/voices.py audition    # 用每个形象的台词生成试听，保存在 audition/
+   python tools/voices.py apply       # 把第一推荐写进 config.json；也可以 --pick deepseek=<voice_id> 手动指定
+   ```
+3. 在配置里加上 `"tts"` 段（见 `config.example.json`），每个选手填 `voice_id`。没设密钥或没填 `voice_id` 的选手不念，打牌照常进行；合成失败也只是这一句没声音。
+
+形象和声音要求写在 `tools/characters.json`，`player` 字段要和 `config.json` 里选手的 `name` 一致。
+
 ## 大模型怎么出牌
 
 每回合程序把手牌、各家剩余张数、底牌、最近 20 手出牌和合法出法列表发给模型，要求它只回一个 JSON：

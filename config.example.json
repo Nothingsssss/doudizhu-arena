@@ -13,7 +13,8 @@
       "base_url": "https://api.deepseek.com/v1",
       "model": "deepseek-chat",
       "api_key_env": "DEEPSEEK_API_KEY",
-      "color": "#4f8cff"
+      "color": "#4f8cff",
+      "voice_id": ""
     },
     {
       "name": "通义千问",
@@ -21,7 +22,8 @@
       "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
       "model": "qwen-plus",
       "api_key_env": "DASHSCOPE_API_KEY",
-      "color": "#a66bff"
+      "color": "#a66bff",
+      "voice_id": ""
     },
     {
       "name": "Kimi",
@@ -29,7 +31,8 @@
       "base_url": "https://api.moonshot.cn/v1",
       "model": "kimi-latest",
       "api_key_env": "MOONSHOT_API_KEY",
-      "color": "#2fd3a0"
+      "color": "#2fd3a0",
+      "voice_id": ""
     },
     {
       "name": "GPT",
@@ -37,7 +40,8 @@
       "base_url": "https://api.openai.com/v1",
       "model": "gpt-4o-mini",
       "api_key_env": "OPENAI_API_KEY",
-      "color": "#ff8a4c"
+      "color": "#ff8a4c",
+      "voice_id": ""
     },
     {
       "name": "本地Ollama",
@@ -45,12 +49,19 @@
       "base_url": "http://localhost:11434/v1",
       "model": "qwen2.5:14b",
       "timeout": 120,
-      "color": "#ffb020"
+      "color": "#ffb020",
+      "voice_id": ""
     },
     {
       "name": "机器人",
       "type": "bot",
       "color": "#8a94b8"
     }
-  ]
+  ],
+  "tts": {
+    "provider": "heygen",
+    "model": "heygen-voice-1-turbo-free",
+    "api_key_env": "HEYGEN_API_KEY",
+    "timeout": 30
+  }
 }

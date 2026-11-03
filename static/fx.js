@@ -349,6 +349,13 @@ function bgmToggle() {
   BGM.on ? bgmStart() : bgmStop();
   return BGM.on;
 }
+// 选手说话时把背景音乐压低
+function duck(on) {
+  if (!BG || !AC) return;
+  const t = AC.currentTime;
+  BG.gain.cancelScheduledValues(t); BG.gain.setValueAtTime(BG.gain.value, t);
+  BG.gain.linearRampToValueAtTime(on ? 0.08 : 0.3, t + (on ? 0.15 : 0.6));
+}
 function danger(on) {
   on = !!on;
   if (BGM.danger === on) return;
@@ -364,5 +371,5 @@ function init() {
 
 window.FX = { LV, AMT, rnd, pick, init, burst, glitter, embers, ring, glow, smoke, debris, confetti, rain, firework, shell,
   shake, punch, flash, rgb, speed, bgHit, bolt, rays, beam, fly, plane, at, beat, danger,
-  ctx, sfxOut, BGM, bgmStart, bgmStop, bgmToggle };
+  ctx, sfxOut, duck, BGM, bgmStart, bgmStop, bgmToggle };
 })();

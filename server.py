@@ -9,12 +9,14 @@ import argparse
 import json
 import queue
 import threading
+from urllib.parse import unquote, urlsplit
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from arena.cards import NAMES
 from arena.game import Arena
 from arena.players import make_player
+from arena.voice import make_tts
 
 ROOT = Path(__file__).parent
 STATIC = ROOT / "static"
@@ -72,7 +74,8 @@ def make_handler(bus):
             pass
 
         def do_GET(self):
-            if self.path == "/events":
+            path = unquote(urlsplit(self.path).path)
+            if path == "/events":
                 self.send_response(200)
                 self.send_header("Content-Type", "text/event-stream; charset=utf-8")
                 self.send_header("Cache-Control", "no-cache")
@@ -91,16 +94,21 @@ def make_handler(bus):
                 finally:
                     bus.unsubscribe(q)
                 return
-            if self.path == "/names":
+            if path == "/names":
                 return self._send(json.dumps(NAMES, ensure_ascii=False).encode(), "application/json")
-            path = "index.html" if self.path in ("/", "") else self.path.lstrip("/")
+            path = "index.html" if path in ("/", "") else path.lstrip("/")
             f = (STATIC / path).resolve()
             if STATIC.resolve() not in f.parents or not f.is_file():
                 self.send_error(404)
                 return
-            ctype = {".html": "text/html", ".js": "application/javascript",
-                     ".css": "text/css"}.get(f.suffix, "application/octet-stream")
-            self._send(f.read_bytes(), ctype + "; charset=utf-8")
+            text = {".html": "text/html", ".js": "application/javascript", ".css": "text/css"}
+            binary = {".wav": "audio/wav", ".mp3": "audio/mpeg", ".ogg": "audio/ogg", ".aac": "audio/aac",
+                      ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
+            if f.suffix in text:
+                ctype = text[f.suffix] + "; charset=utf-8"
+            else:
+                ctype = binary.get(f.suffix.lower(), "application/octet-stream")
+            self._send(f.read_bytes(), ctype)
 
         def _send(self, body, ctype):
             self.send_response(200)
@@ -126,7 +134,8 @@ def main():
                   move_delay=a.get("move_delay", 1.5),
                   game_pause=a.get("game_pause", 8),
                   eliminate_forever=a.get("eliminate_forever", False),
-                  seed=a.get("seed"))
+                  seed=a.get("seed"),
+                  tts=make_tts(cfg.get("tts"), STATIC / "audio"))
     threading.Thread(target=arena.run_forever, kwargs={"max_games": a.get("max_games")},
                      daemon=True).start()
 
