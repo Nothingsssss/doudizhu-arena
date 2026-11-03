@@ -1,0 +1,37 @@
+{
+  "port": 8000,
+  "arena": {
+    "demo": true,
+    "move_delay": 1.2,
+    "game_pause": 6,
+    "eliminate_forever": false,
+    "max_games": null
+  },
+  "players": [
+    {
+      "name": "DeepSeek",
+      "color": "#4f8cff",
+      "model": "deepseek-chat"
+    },
+    {
+      "name": "通义千问",
+      "color": "#a66bff",
+      "model": "qwen-plus"
+    },
+    {
+      "name": "MiMo",
+      "color": "#ff8a3d",
+      "model": "mimo"
+    },
+    {
+      "name": "豆包",
+      "color": "#ffc83d",
+      "model": "doubao"
+    },
+    {
+      "name": "Claude",
+      "color": "#ff6a2b",
+      "model": "claude"
+    }
+  ]
+}

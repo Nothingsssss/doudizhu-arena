@@ -17,6 +17,7 @@ from arena.cards import NAMES
 from arena.game import Arena
 from arena.players import make_player
 from arena.voice import make_tts
+from arena.demo import Showcase, demo_players, wrap_emit
 
 ROOT = Path(__file__).parent
 STATIC = ROOT / "static"
@@ -124,18 +125,27 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default=str(ROOT / "config.json"))
     ap.add_argument("--port", type=int, default=None)
+    ap.add_argument("--demo", action="store_true", help="演示模式：机器人打牌，保证所有牌型都出现")
     args = ap.parse_args()
     cfg = json.loads(Path(args.config).read_text(encoding="utf-8"))
 
     bus = Bus()
-    players = [make_player(p) for p in cfg["players"]]
     a = cfg.get("arena", {})
-    arena = Arena(players, bus.emit,
+    emit, dealer = bus.emit, None
+    if args.demo or a.get("demo"):
+        showcase = Showcase()
+        players = demo_players(cfg["players"], showcase)
+        emit, dealer = wrap_emit(bus.emit, showcase), showcase.deal
+        print("演示模式：不调用大模型接口，所有牌型都会依次打出", flush=True)
+    else:
+        players = [make_player(p) for p in cfg["players"]]
+    arena = Arena(players, emit,
                   move_delay=a.get("move_delay", 1.5),
                   game_pause=a.get("game_pause", 8),
                   eliminate_forever=a.get("eliminate_forever", False),
                   seed=a.get("seed"),
-                  tts=make_tts(cfg.get("tts"), STATIC / "audio"))
+                  tts=make_tts(cfg.get("tts"), STATIC / "audio"),
+                  dealer=dealer)
     threading.Thread(target=arena.run_forever, kwargs={"max_games": a.get("max_games")},
                      daemon=True).start()
 

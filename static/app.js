@@ -599,6 +599,20 @@ const H = {
   },
 
   champion(d) { showChampion(d); },
+
+  demo_progress(d) {
+    let el = $("demoPill");
+    if (!el) {
+      el = document.createElement("div"); el.id = "demoPill"; el.className = "demo-pill";
+      $("phase").parentElement.insertBefore(el, $("phase"));
+    }
+    el.innerHTML = `<label>演示 · 第 ${d.round} 轮</label><b>牌型 ${d.shown}/${d.total}</b>`;
+    el.title = d.missing.length ? "还没出：" + d.missing.join("、") : "全部牌型已展示";
+    el.classList.toggle("done", !!d.complete);
+    if (!d.type) return;
+    feed(null, `新牌型：${d.type}（${d.shown}/${d.total}）` + (d.complete ? " · 全部展示完毕" : ""));
+    if (d.complete) toast("14 种牌型全部展示完毕", "blue");
+  },
 };
 
 function handle(ev) {

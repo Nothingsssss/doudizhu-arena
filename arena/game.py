@@ -7,12 +7,13 @@ from .cards import TYPE_NAMES, fmt, new_deck, validate
 
 
 class Game:
-    def __init__(self, players, emit, move_delay=1.0, rng=None, tts=None):
+    def __init__(self, players, emit, move_delay=1.0, rng=None, tts=None, dealer=None):
         self.players = players          # 3 个 Player，按座位顺序（逆时针出牌）
         self.emit = emit
         self.move_delay = move_delay
         self.rng = rng or random.Random()
         self.tts = tts
+        self.dealer = dealer        # 演示模式用：自定义发牌
 
     def _sleep(self, audio=None):
         # 有语音时等它念完再继续，避免几个人的话叠在一起
@@ -28,6 +29,8 @@ class Game:
         return self.tts.speak(say, getattr(self.players[seat], "voice_id", ""))
 
     def _deal(self):
+        if self.dealer:
+            return self.dealer(self.rng)
         deck = new_deck()
         self.rng.shuffle(deck)
         return [sorted(deck[0:17]), sorted(deck[17:34]), sorted(deck[34:51])], sorted(deck[51:])
@@ -141,11 +144,12 @@ class Arena:
     """
 
     def __init__(self, players, emit, move_delay=1.0, game_pause=5.0,
-                 eliminate_forever=False, seed=None, tts=None):
+                 eliminate_forever=False, seed=None, tts=None, dealer=None):
         if len(players) < 3:
             raise ValueError("至少需要 3 名玩家")
         self.rng = random.Random(seed)
         self.tts = tts
+        self.dealer = dealer
         self.table = list(players[:3])
         self.queue = deque(players[3:])
         self.out = []
@@ -185,7 +189,7 @@ class Arena:
     def play_one(self):
         self.game_no += 1
         self.emit("game_start", {"game_no": self.game_no, **self.snapshot()})
-        res = Game(self.table, self.emit, self.move_delay, self.rng, self.tts).run()
+        res = Game(self.table, self.emit, self.move_delay, self.rng, self.tts, self.dealer).run()
 
         win_side = res["winner_side"]
         for i, p in enumerate(self.table):
